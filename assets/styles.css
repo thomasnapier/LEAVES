@@ -1,0 +1,26 @@
+/* For the buttons */
+button {
+    font-size: 24px;
+    margin: 5px;
+}
+
+/* For the audio status text */
+#audio-status {
+    font-size: 18px;
+    text-align: center;
+}
+
+/* For the whole layout */
+div {
+    text-align: center;
+}
+
+/* For the graph */
+#scatter-plot {
+    height: 80vh;
+}
+
+
+#hidden-sample-data{
+    display: none;
+}
