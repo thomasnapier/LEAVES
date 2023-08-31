@@ -20,7 +20,37 @@ div {
     height: 80vh;
 }
 
-
+/* Style for hidden sample data */
 #hidden-sample-data{
     display: none;
+}
+
+/* Style for button group */
+#button-group {
+    text-align: center;
+}
+
+/* Style for the checkboxes */
+#class-labels-checklist {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 10px;
+}
+
+/* Style for spectrogram and checkboxes container */
+#feature-area {
+    display: flex;
+    justify-content: space-around;
+}
+
+/* Style for spectrogram and button controls container */
+#spectrogram-area {
+    display: flex;
+    justify-content: space-around;
+}
+
+/* Style for scatterplot and checkboxes container */
+#plot-area {
+    display: flex;
+    justify-content: space-between;
 }

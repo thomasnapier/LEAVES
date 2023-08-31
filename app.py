@@ -8,15 +8,22 @@ import pygame
 import random
 import json
 from itertools import cycle
+import base64
+from io import BytesIO
+import matplotlib.pyplot as plt
+import numpy as np
+import soundfile as sf
 
 # Existing code
 df = pd.read_csv('data/umap-Wambiana-WetB-20min-full-day.csv')
 pygame.mixer.init()
 
-# Global variables
 current_cluster_index = 0
 sampled_point_index = 0
 samples_json = None
+label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
+                 "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
+                 "Wind (Strong)", "Wind (Light)"]
 
 colors = cycle(plotly.colors.sequential.Rainbow)
 fig = go.Figure()
@@ -31,19 +38,38 @@ for c in df['class'].unique():
                                marker_color=next(colors)))
 
 # Define app and layout
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=["assets\\styles.css"])
 
 # Layout
 app.layout = html.Div([
     dcc.Graph(id='scatter-plot', figure=fig, style={'height': '80vh'}),
     html.Div([
+        dcc.Checklist(id='class-labels-checklist',
+                  options=[
+                      {'label': 'Background Silence', 'value': 'background_silence'},
+                      {'label': 'Birds', 'value': 'birds'},
+                      {'label': 'Frogs', 'value': 'frogs'},
+                      {'label': 'Human Speech', 'value': 'human_speech'},
+                      {'label': 'Insects', 'value': 'insects'},
+                      {'label': 'Mammals', 'value': 'mammals'},
+                      {'label': 'Misc/Uncertain', 'value': 'misc'},
+                      {'label': 'Rain (Heavy)', 'value': 'rain_heavy'},
+                      {'label': 'Rain (Light)', 'value': 'rain_light'},
+                      {'label': 'Vehicles (Aircraft/Cars)', 'value': 'vehicles'},
+                      {'label': 'Wind (Strong)', 'value': 'wind_strong'},
+                      {'label': 'Wind (Light)', 'value': 'wind_light'},
+                  ],
+                  value=[]),
+        html.Img(id='mel-spectrogram', src='')
+    ], id='feature-area'),
+    html.Div([
         html.Button('◁', id='previous-point'),
         html.Button('⏯', id='play-audio'),
         html.Button('▷', id='next-point'),
-    ]),
+    ], id='button-group'),
     html.Div(id='audio-status', children='No audio being played currently.'),
     html.Div(id='hidden-sample-data')
-], style={'textAlign': 'center'})
+])
 
 @app.callback(
     [Output('scatter-plot', 'figure'),
@@ -123,6 +149,38 @@ def process_audio(play_clicks, next_clicks, prev_clicks, samples_json):
             trace.marker.size = 2
 
     return fig, status, samples_json
+
+@app.callback(Output('mel-spectrogram', 'src'),
+              [Input('play-audio', 'n_clicks'),
+               Input('next-point', 'n_clicks')],
+              [State('hidden-sample-data', 'children')])
+def update_spectrogram(play_clicks, next_clicks, samples_json):
+    # Clear previous figure
+    plt.clf()
+
+    plt.figure(figsize=(5, 2))
+    if samples_json is None:
+        return dash.no_update
+
+    samples = json.loads(samples_json)
+    current_sample = samples["data"][samples["current_index"]]
+    sound_file = current_sample['sound_path']
+
+    # Generate Mel spectrogram using matplotlib and soundfile
+    data, samplerate = sf.read(sound_file)
+    plt.specgram(data, NFFT=1024, Fs=samplerate, noverlap=512)
+    plt.title('Mel Spectrogram')
+
+    # Convert the matplotlib figure to a PNG image
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    
+    # Encode the image as base64
+    image_base64 = base64.b64encode(buf.read()).decode()
+
+    # Return the base64 encoded image as the src of the HTML image tag
+    return f'data:image/png;base64,{image_base64}'
 
 
 def play_sound(sound_file):
