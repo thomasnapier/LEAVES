@@ -13,6 +13,8 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import numpy as np
 import soundfile as sf
+import glob
+import matplotlib
 
 # Existing code
 df = pd.read_csv('data/umap-Wambiana-WetB-20min-full-day.csv')
@@ -24,6 +26,8 @@ samples_json = None
 label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
                  "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
                  "Wind (Strong)", "Wind (Light)"]
+file_options = [{'label': file.split("\\")[-1], 'value': file} for file in glob.glob("data/*.csv")]
+
 
 colors = cycle(plotly.colors.sequential.Rainbow)
 fig = go.Figure()
@@ -42,7 +46,8 @@ app = dash.Dash(__name__, external_stylesheets=["assets\\styles.css"])
 
 # Layout
 app.layout = html.Div([
-    dcc.Graph(id='scatter-plot', figure=fig, style={'height': '80vh'}),
+    dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
+    dcc.Graph(id='scatter-plot', figure=fig, style={'height': '60vh'}),
     html.Div([
         dcc.Checklist(id='class-labels-checklist',
                   options=[
@@ -77,9 +82,10 @@ app.layout = html.Div([
      Output('hidden-sample-data', 'children')],
     [Input('play-audio', 'n_clicks'),
      Input('next-point', 'n_clicks'),
-     Input('previous-point', 'n_clicks')],
+     Input('previous-point', 'n_clicks'),
+     Input('file-dropdown', 'value')],
     State('hidden-sample-data', 'children'))
-def process_audio(play_clicks, next_clicks, prev_clicks, samples_json):
+def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, samples_json):
     global current_cluster_index, sampled_point_index
     # Trigger context
     ctx = dash.callback_context
@@ -128,9 +134,13 @@ def process_audio(play_clicks, next_clicks, prev_clicks, samples_json):
         current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
         status = f"Playing sample {samples['current_index'] + 1} from cluster: {current_class}"
 
-
-
-        return fig, status, samples_json
+    elif button_id == 'file-dropdown':
+        new_fig = update_figure(selected_file)
+        # Initialize samples_json when file changes
+        current_class = df['class'].unique()[current_cluster_index]
+        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
+        new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
+        return new_fig, "File changed. Playing from the first point in the new cluster.", new_samples_json
 
     # Update the sample index and audio status
     current_sample = samples["data"][sampled_point_index]
@@ -157,6 +167,7 @@ def process_audio(play_clicks, next_clicks, prev_clicks, samples_json):
 def update_spectrogram(play_clicks, next_clicks, samples_json):
     # Clear previous figure
     plt.clf()
+    matplotlib.pyplot.close()
 
     plt.figure(figsize=(5, 2))
     if samples_json is None:
@@ -189,6 +200,29 @@ def play_sound(sound_file):
     
 def pause_sound():
     pygame.mixer.music.pause()
+
+def update_figure(selected_file):
+    global df, current_cluster_index, sampled_point_index
+    # Read the new CSV file and update dataframe
+    df = pd.read_csv(selected_file)
+
+    # Reset global variables
+    current_cluster_index = 0
+    sampled_point_index = 0
+
+    # Create a new figure based on the new data
+    fig = go.Figure()
+    colors = cycle(plotly.colors.sequential.Rainbow)
+    for c in df['class'].unique():
+        dfi = df[df['class'] == c]
+        fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
+                                   mode='markers',
+                                   name=str(c),
+                                   customdata=dfi['sound_path'],
+                                   marker=dict(size=2),
+                                   marker_color=next(colors)))
+
+    return fig
 
 if __name__ == '__main__':
     app.run_server(debug=True)
