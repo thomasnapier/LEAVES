@@ -83,9 +83,10 @@ app.layout = html.Div([
     [Input('play-audio', 'n_clicks'),
      Input('next-point', 'n_clicks'),
      Input('previous-point', 'n_clicks'),
-     Input('file-dropdown', 'value')],
+     Input('file-dropdown', 'value'),
+     Input('scatter-plot', 'clickData')],
     State('hidden-sample-data', 'children'))
-def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, samples_json):
+def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickData, samples_json):
     global current_cluster_index, sampled_point_index
     # Trigger context
     ctx = dash.callback_context
@@ -141,6 +142,13 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, samples_
         sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
         return new_fig, "File changed. Playing from the first point in the new cluster.", new_samples_json
+    
+    elif clickData:
+        clicked_point = clickData['points'][0]['customdata']
+        play_sound(clicked_point)
+        current_class = df[df['sound_path'] == clicked_point]['class'].iloc[0]
+        status = f"Playing sample from clicked point in cluster: {current_class}"
+        return dash.no_update, status, samples_json  # Use dash.no_update for figure so that it doesn't change.
 
     # Update the sample index and audio status
     current_sample = samples["data"][sampled_point_index]
