@@ -6,18 +6,8 @@ button {
 
 /* For the audio status text */
 #audio-status {
-    font-size: 18px;
+    font-size: 24px;
     text-align: center;
-}
-
-/* For the whole layout */
-div {
-    text-align: center;
-}
-
-/* For the graph */
-#scatter-plot {
-    height: 80vh;
 }
 
 /* Style for hidden sample data */
@@ -25,32 +15,135 @@ div {
     display: none;
 }
 
-/* Style for button group */
-#button-group {
-    text-align: center;
+/* Style for the checkboxes */
+#class-labels-checklist, #checklist-title {
+    display: list-item;
+    text-align: left;
+    padding-left: 10px;
+    font-size: 24px;
 }
 
-/* Style for the checkboxes */
-#class-labels-checklist {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-gap: 10px;
+#control-button {
+    font-size: 14px;
+    display: list-item;
+    text-align: left;
 }
 
 /* Style for spectrogram and checkboxes container */
 #feature-area {
     display: flex;
     justify-content: space-around;
+    width: 70%;
+    float: right;
 }
 
-/* Style for spectrogram and button controls container */
-#spectrogram-area {
+/* Style for the main container */
+#main-container {
+    text-align: center;
     display: flex;
-    justify-content: space-around;
+    flex-direction: column;
+    align-items: center;
 }
 
-/* Style for scatterplot and checkboxes container */
+/* Style for scatterplot, dropdown, and checkboxes container */
 #plot-area {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    float: left;
+    height: 100%;
+}
+
+/* Style for spectrogram */
+#spectrogram-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    float: right;
+    height: 100%;
+    border: 2px solid black;
+}
+
+/* Style for the new wrapper Div */
+#main-horizontal-layout {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+#button-group {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#file-dropdown{
+    width: 50%;
+}
+
+#checklist-container {
+    width: 20%;
+    border: 2px solid black;
+}
+
+#scatterplot-container {
+    width: 70%; 
+    border: 2px solid black;
+}
+
+/* If you want to add a small gap between the two, you could do the following */
+#checklist-container {
+    padding-right: 1%;
+}
+
+#scatterplot-container {
+    padding-left: 1%;
+}
+
+/* Media Queries for Responsiveness */
+
+@media only screen and (max-width: 768px) {
+    /* On small screens, stack elements vertically */
+    #main-horizontal-layout {
+        flex-direction: column;
+        align-items: flex-start;  /* Align to the start */
+    }
+
+    /* Full width dropdown on small screens */
+    #file-dropdown {
+        width: 100%;
+    }
+
+    /* Adjust text size */
+    #audio-status, button {
+        font-size: 16px;
+    }
+
+    /* Change grid for checklist */
+    #class-labels-checklist {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Checklist container */
+    #checklist-container {
+        width: 100%;  /* Take up full width */
+        text-align: center; /* Center the content */
+        overflow-x: auto;  /* Scroll if content is too wide */
+    }
+
+    /* Flexible scatter plot */
+    #scatterplot-container {
+        flex: 1;
+        height: auto;
+    }
+
+    /* Full width containers */
+    #checklist-container, #scatterplot-container, #button-group {
+        width: 100%;
+        text-align: center;
+    }
 }
