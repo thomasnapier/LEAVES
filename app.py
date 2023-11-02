@@ -5,7 +5,6 @@ Organisation: James Cook University
 GitHub: https://github.com/thomasnapier/A2OAudioLabeller
 Description: This is a program designed to improve the audio labelling efficiency of
 samples derived from the Australian Acoustic Observatory (A2O)
-Date: 14/09/23
 """
 
 #Imports
@@ -44,6 +43,7 @@ samples_json = None
 
 colors = cycle(plotly.colors.sequential.Rainbow)
 fig = go.Figure()
+fig.update_layout(paper_bgcolor="#171b26")
 for c in df['class'].unique():
     dfi = df[df['class'] == c]
     fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
@@ -60,43 +60,46 @@ for label_option in label_options:
 # Define app and layout
 app = dash.Dash(__name__, external_stylesheets=["assets\\styles.css"])
 
-# Layout
 app.layout = html.Div([
-    dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
-    html.Div(id='audio-status', children='No audio being played currently.'),
-    html.Div([
-        html.Img(id='mel-spectrogram', src=''),
-    ], id='spectrogram-area'),
-    html.Div([
-        html.Div([
+    html.Div('A20AudioLabeller', id='top-banner'),  # Top banner with the app title
+    html.Div([  # Main content area
+        html.Div([  # Left column container
+            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
+            dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
+            html.Div(dcc.Graph(id='scatter-plot', figure=fig), 
+                     id='scatterplot-container'),
+            html.Div([
             html.Div(id='checklist-title', children='Classes:'),
             dcc.Checklist(id='class-labels-checklist',
                   options=[
-                      {'label': 'Background Silence', 'value': 'background_silence'},
-                      {'label': 'Birds', 'value': 'birds'},
-                      {'label': 'Frogs', 'value': 'frogs'},
-                      {'label': 'Human Speech', 'value': 'human_speech'},
-                      {'label': 'Insects', 'value': 'insects'},
-                      {'label': 'Mammals', 'value': 'mammals'},
-                      {'label': 'Misc/Uncertain', 'value': 'misc'},
-                      {'label': 'Rain (Heavy)', 'value': 'rain_heavy'},
-                      {'label': 'Rain (Light)', 'value': 'rain_light'},
-                      {'label': 'Vehicles (Aircraft/Cars)', 'value': 'vehicles'},
-                      {'label': 'Wind (Strong)', 'value': 'wind_strong'},
-                      {'label': 'Wind (Light)', 'value': 'wind_light'},
+                      {'label': 'Background Silence', 'value': 'Background Silence'},
+                      {'label': 'Birds', 'value': 'Birds'},
+                      {'label': 'Frogs', 'value': 'Frogs'},
+                      {'label': 'Human Speech', 'value': 'Human Speech'},
+                      {'label': 'Insects', 'value': 'Insects'},
+                      {'label': 'Mammals', 'value': 'Mammals'},
+                      {'label': 'Misc/Uncertain', 'value': 'Misc/Uncertain'},
+                      {'label': 'Rain (Heavy)', 'value': 'Rain (Heavy)'},
+                      {'label': 'Rain (Light)', 'value': 'Rain (Light)'},
+                      {'label': 'Vehicles (Aircraft/Cars)', 'value': 'Vehicles (Aircraft/Cars)'},
+                      {'label': 'Wind (Strong)', 'value': 'Wind (Strong)'},
+                      {'label': 'Wind (Light)', 'value': 'Wind (Light)'},
                       #TODO: Make this list user-defined and/or enable users to make changes
                         ],value=[]),
                 html.Div([
             html.Button('Save Data File', id='control-button')
         ])], id='checklist-container'),
-        html.Div(dcc.Graph(id='scatter-plot', figure=fig, style={'height': '50vh'}), 
-                 id='scatterplot-container')
+        ], id='left-column'),  # Closing left column
+        html.Div([  # Right column container
+            html.Div(id='audio-status', children='No audio being played currently.'),
+            html.Div([  # Control buttons
+                html.Button('◁', id='previous-point'),
+                html.Button('⏯', id='play-audio'),
+                html.Button('▷', id='next-point'),
+            ], id='button-group'),
+            html.Img(id='mel-spectrogram', src=''),
+        ], id='right-column')
     ], id='main-horizontal-layout'),
-    html.Div([
-            html.Button('◁', id='previous-point'),
-            html.Button('⏯', id='play-audio'),
-            html.Button('▷', id='next-point'),
-                ], id='button-group'),
     html.Div(id='hidden-sample-data'),
     html.Div(id='csv-dummy-output')
 ], id='main-container')
@@ -332,6 +335,7 @@ def update_figure(selected_file):
 
     # Create a new figure based on the new data
     fig = go.Figure()
+    fig.update_layout(paper_bgcolor="#171b26")
     colors = cycle(plotly.colors.sequential.Rainbow)
     for c in df['class'].unique():
         dfi = df[df['class'] == c]
