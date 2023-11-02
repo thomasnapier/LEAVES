@@ -1,3 +1,8 @@
+html{
+    margin: 0;
+    padding: 0;
+}
+
 body {
     font-size: 1em;
     line-height: 1.6;
@@ -22,24 +27,21 @@ body {
     width: 100%;
 }
 
-/* Main content area divided into left and right sections */
+* {
+    box-sizing: border-box; /* This ensures that padding and border are included in the total width and height */
+}
+
 #main-horizontal-layout {
     display: flex;
     flex-wrap: nowrap;
-    width: 100%;
+    overflow: hidden; /* This will hide any overflowing content */
 }
 
-/* Additional changes not strictly necessary, but for consistency */
 #left-column, #right-column {
     flex: 1; /* This will equally divide the space for both columns */
     padding: 20px;
-    display: flex;
-    flex-direction: column;
-}
-
-/* If you keep the flex-basis 50% make sure no other margins or paddings are causing overflow */
-#left-column, #right-column {
-    flex-basis: 50%;
+    max-width: calc(50% - 40px); /* Subtract the padding from the max-width */
+    box-sizing: border-box;
 }
 
 /* Project paragraph styling */
@@ -65,6 +67,12 @@ button {
 #audio-status {
     font-size: 1.5em;
     margin-bottom: 20px;
+}
+
+#checklist-container{
+    column-count: 3; /* Adjust the number as needed for more or fewer columns */
+    column-gap: 20px; /* Adjust the gap between columns */
+    width: 100%;
 }
 
 /* Correct spectrogram ID if necessary */

@@ -26,6 +26,15 @@ import numpy as np
 import soundfile as sf
 import glob
 import matplotlib
+from dash.exceptions import PreventUpdate
+from dash import dcc
+import os
+from pydub import AudioSegment
+import zipfile
+from flask import Flask, send_from_directory
+import shutil
+import tempfile
+
 
 # Initialise
 pygame.mixer.init()
@@ -34,12 +43,13 @@ label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insect
                  "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
                  "Wind (Strong)", "Wind (Light)"]
 file_options = [{'label': file.split("\\")[-1], 'value': file} for file in glob.glob("data/*.csv")]
-
-# Global Variables
 current_cluster_index = 0
 current_csv_file = 'data/umap-Duval-DryA-20min-full-day.csv'
 sampled_point_index = 0
 samples_json = None
+
+# Assume temporary storage on the server-side
+TEMP_FOLDER = tempfile.mkdtemp()
 
 colors = cycle(plotly.colors.sequential.Rainbow)
 fig = go.Figure()
@@ -64,7 +74,22 @@ app.layout = html.Div([
     html.Div('A20AudioLabeller', id='top-banner'),  # Top banner with the app title
     html.Div([  # Main content area
         html.Div([  # Left column container
-            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
+            dcc.Upload(
+                id='upload-audio',
+                children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
+                style={
+                    'width': '100%',
+                    'height': '60px',
+                    'lineHeight': '60px',
+                    'borderWidth': '1px',
+                    'borderStyle': 'dashed',
+                    'borderRadius': '5px',
+                    'textAlign': 'center',
+                    'margin-bottom': '10px',
+                },
+                # Allow multiple files to be uploaded
+                multiple=False
+            ),
             dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
             html.Div(dcc.Graph(id='scatter-plot', figure=fig), 
                      id='scatterplot-container'),
@@ -91,6 +116,7 @@ app.layout = html.Div([
         ])], id='checklist-container'),
         ], id='left-column'),  # Closing left column
         html.Div([  # Right column container
+            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
             html.Div(id='audio-status', children='No audio being played currently.'),
             html.Div([  # Control buttons
                 html.Button('◁', id='previous-point'),
@@ -101,7 +127,8 @@ app.layout = html.Div([
         ], id='right-column')
     ], id='main-horizontal-layout'),
     html.Div(id='hidden-sample-data'),
-    html.Div(id='csv-dummy-output')
+    html.Div(id='csv-dummy-output'),
+    html.Div(id='csv-test')
 ], id='main-container')
 
 # Callbacks
@@ -315,6 +342,48 @@ def update_spectrogram(play_clicks, next_clicks, samples_json):
     # Return the base64 encoded image as the src of the HTML image tag
     return f'data:image/png;base64,{image_base64}'
 
+# Callback for handling the upload and processing of the audio file
+@app.callback(
+    Output('csv-test', 'children'),
+    Input('upload-audio', 'contents'),
+    State('upload-audio', 'filename'),
+    State('upload-audio', 'last_modified')
+)
+def handle_upload(contents, filename, date):
+    if contents is not None:
+        content_type, content_string = contents.split(',')
+
+        decoded = base64.b64decode(content_string)
+
+        # Generate a unique folder for the uploaded file chunks
+        output_folder = os.path.join(TEMP_FOLDER, os.path.splitext(filename)[0])
+        os.makedirs(output_folder, exist_ok=True)
+
+        # Determine the file format from the file name extension
+        file_format = filename.rsplit('.', 1)[1].lower()
+
+        # Process the uploaded file
+        temp_file_path = os.path.join(output_folder, filename)
+        with open(temp_file_path, 'wb') as temp_file:
+            temp_file.write(decoded)
+
+        # Use the file format determined from the filename to load the audio file appropriately
+        audio = AudioSegment.from_file(temp_file_path, format=file_format)
+        process_audio_chunk(audio, output_folder, file_format, os.path.splitext(filename)[0], duration=20)
+
+        # Clean up the temporary source file
+        os.remove(temp_file_path)
+
+        # Create a zip file with the chunks
+        zip_path = create_zip_file(output_folder, os.path.splitext(filename)[0])
+
+        # Provide a link for the client to download the zip
+        return html.A('Download Chunks', href='/download/{}'.format(os.path.basename(zip_path)))
+
+# Flask route for serving the zipped audio chunks
+@app.server.route('/download/<path:path>')
+def serve_zip(path):
+    return send_from_directory(TEMP_FOLDER, path, as_attachment=True)
 
 # Functions
 def play_sound(sound_file):
@@ -347,6 +416,40 @@ def update_figure(selected_file):
                                    marker_color=next(colors)))
 
     return fig
+
+def process_audio_chunk(audio, output_folder, file_format, original_filename, duration):
+    duration_seconds = duration * 60  # Convert duration from minutes to seconds
+    chunk_length_ms = 4500  # Length of each audio chunk in milliseconds
+
+    total_length_ms = len(audio)
+    total_chunks = total_length_ms // chunk_length_ms
+    total_time_ms = 0
+
+    for chunk_index in range(total_chunks):
+        if total_time_ms > duration_seconds * 1000:
+            break
+
+        start_time = chunk_index * chunk_length_ms
+        end_time = start_time + chunk_length_ms
+        chunk_data = audio[start_time:end_time]
+
+        chunk_file_name = f'{original_filename}_{chunk_index}.{file_format}'
+        chunk_file_path = os.path.join(output_folder, chunk_file_name)
+
+        chunk_data.export(chunk_file_path, format=file_format)
+        total_time_ms += chunk_length_ms
+
+    print(f'File {original_filename} split into {total_chunks} chunks.')
+
+def create_zip_file(output_folder, original_filename):
+    zip_path = os.path.join(TEMP_FOLDER, f'{original_filename}.zip')
+    with zipfile.ZipFile(zip_path, 'w') as zipf:
+        for root, dirs, files in os.walk(output_folder):
+            for file in files:
+                file_path = os.path.join(root, file)
+                zipf.write(file_path, os.path.relpath(file_path, output_folder))
+    return zip_path
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
