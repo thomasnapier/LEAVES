@@ -34,6 +34,9 @@ import zipfile
 from flask import Flask, send_from_directory
 import shutil
 import tempfile
+import librosa
+import charset_normalizer
+from sklearn.preprocessing import MinMaxScaler
 
 
 # Initialise
@@ -53,7 +56,6 @@ TEMP_FOLDER = tempfile.mkdtemp()
 
 colors = cycle(plotly.colors.sequential.Rainbow)
 fig = go.Figure()
-fig.update_layout(paper_bgcolor="#171b26")
 for c in df['class'].unique():
     dfi = df[df['class'] == c]
     fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
@@ -67,6 +69,17 @@ for label_option in label_options:
     if label_option.lower().replace(' ', '_') not in df.columns:
         df[label_option.lower().replace(' ', '_')] = 0
 
+fig.update_layout(
+    paper_bgcolor="#171b26",
+    legend_orientation='h',  # Horizontal orientation
+    legend=dict(
+        x=0,  # Adjust legend X position
+        y=-0.5,  # Adjust legend Y position to be below the plot
+        xanchor='left',
+        yanchor='top'
+    )
+)
+
 # Define app and layout
 app = dash.Dash(__name__, external_stylesheets=["assets\\styles.css"])
 
@@ -74,25 +87,41 @@ app.layout = html.Div([
     html.Div('A20AudioLabeller', id='top-banner'),  # Top banner with the app title
     html.Div([  # Main content area
         html.Div([  # Left column container
-            dcc.Upload(
-                id='upload-audio',
-                children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-                style={
-                    'width': '100%',
-                    'height': '60px',
-                    'lineHeight': '60px',
-                    'borderWidth': '1px',
-                    'borderStyle': 'dashed',
-                    'borderRadius': '5px',
-                    'textAlign': 'center',
-                    'margin-bottom': '10px',
-                },
-                # Allow multiple files to be uploaded
-                multiple=False
-            ),
-            dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
+        dcc.Loading(  # Add the Loading component
+            id="loading-upload",
+            children=[
+                dcc.Upload(
+                    id='upload-audio',
+                    children=html.Div(['Drag and Drop or ', html.A('Select Files'), html.Div(id='csv-test')]),
+                    style={
+                        'width': '100%',
+                        'height': '60px',
+                        'lineHeight': '60px',
+                        'borderWidth': '1px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '5px',
+                        'textAlign': 'center',
+                        'margin-bottom': '10px',
+                    },
+                    # Allow multiple files to be uploaded
+                    multiple=False
+                ),
+            ],
+            type="circle", 
+        ),
+            dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value'], style={'display': 'none'}),
             html.Div(dcc.Graph(id='scatter-plot', figure=fig), 
                      id='scatterplot-container'),
+        ], id='left-column'),  # Closing left column
+        html.Div([  # Right column container
+            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
+            html.Div(id='audio-status', children='No audio being played currently.'),
+            html.Div([  # Control buttons
+                html.Button('◁', id='previous-point'),
+                html.Button('⏯', id='play-audio'),
+                html.Button('▷', id='next-point'),
+            ], id='button-group'),
+            html.Img(id='mel-spectrogram', src=''),
             html.Div([
             html.Div(id='checklist-title', children='Classes:'),
             dcc.Checklist(id='class-labels-checklist',
@@ -114,21 +143,10 @@ app.layout = html.Div([
                 html.Div([
             html.Button('Save Data File', id='control-button')
         ])], id='checklist-container'),
-        ], id='left-column'),  # Closing left column
-        html.Div([  # Right column container
-            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
-            html.Div(id='audio-status', children='No audio being played currently.'),
-            html.Div([  # Control buttons
-                html.Button('◁', id='previous-point'),
-                html.Button('⏯', id='play-audio'),
-                html.Button('▷', id='next-point'),
-            ], id='button-group'),
-            html.Img(id='mel-spectrogram', src=''),
         ], id='right-column')
     ], id='main-horizontal-layout'),
     html.Div(id='hidden-sample-data'),
-    html.Div(id='csv-dummy-output'),
-    html.Div(id='csv-test')
+    html.Div(id='csv-dummy-output')
 ], id='main-container')
 
 # Callbacks
@@ -369,7 +387,7 @@ def handle_upload(contents, filename, date):
 
         # Use the file format determined from the filename to load the audio file appropriately
         audio = AudioSegment.from_file(temp_file_path, format=file_format)
-        process_audio_chunk(audio, output_folder, file_format, os.path.splitext(filename)[0], duration=20)
+        csv_path = process_audio_chunk(audio, output_folder, file_format, os.path.splitext(filename)[0], duration=20)
 
         # Clean up the temporary source file
         os.remove(temp_file_path)
@@ -417,9 +435,22 @@ def update_figure(selected_file):
 
     return fig
 
+def get_features(y, sr):
+    y = y[0:sr]
+    S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128)
+    log_S = librosa.amplitude_to_db(S, ref=np.max)
+    mfcc = librosa.feature.mfcc(S=log_S, n_mfcc=13)
+    delta_mfcc = librosa.feature.delta(mfcc, mode='nearest')
+    delta2_mfcc = librosa.feature.delta(mfcc, order=2, mode='nearest')
+    feature_vector = np.concatenate((np.mean(mfcc,1), np.mean(delta_mfcc,1), np.mean(delta2_mfcc,1)))
+    feature_vector = (feature_vector-np.mean(feature_vector)) / np.std(feature_vector)
+    return feature_vector
+
 def process_audio_chunk(audio, output_folder, file_format, original_filename, duration):
     duration_seconds = duration * 60  # Convert duration from minutes to seconds
     chunk_length_ms = 4500  # Length of each audio chunk in milliseconds
+    feature_vectors = []
+    sound_paths = []
 
     total_length_ms = len(audio)
     total_chunks = total_length_ms // chunk_length_ms
@@ -439,7 +470,24 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
         chunk_data.export(chunk_file_path, format=file_format)
         total_time_ms += chunk_length_ms
 
-    print(f'File {original_filename} split into {total_chunks} chunks.')
+        # Load chunk and extract features
+        y, sr = librosa.load(chunk_file_path, sr=None)
+        feat = get_features(y, sr)
+        feature_vectors.append(feat)
+        sound_paths.append(chunk_file_path)
+
+    # Normalize the feature vectors
+    min_max_scaler = MinMaxScaler()
+    x_scaled = min_max_scaler.fit_transform(feature_vectors)
+    feature_vectors = pd.DataFrame(x_scaled)
+
+    # Save feature vectors to CSV
+    paths = pd.DataFrame(sound_paths)
+    df = pd.concat([feature_vectors, paths], ignore_index=True, sort=False, axis=1)
+    features_csv_path = os.path.join(output_folder, f'{original_filename}_features.csv')
+    df.to_csv(features_csv_path, index=False)
+
+    return features_csv_path
 
 def create_zip_file(output_folder, original_filename):
     zip_path = os.path.join(TEMP_FOLDER, f'{original_filename}.zip')
