@@ -9,6 +9,7 @@ samples derived from the Australian Acoustic Observatory (A2O)
 
 #Imports
 import pandas as pd
+from py import process
 import plotly.graph_objs as go
 import dash
 from dash import dcc, html, State
@@ -37,6 +38,10 @@ import tempfile
 import librosa
 import charset_normalizer
 from sklearn.preprocessing import MinMaxScaler
+import umap
+from sklearn.metrics import silhouette_score
+from sklearn.cluster import DBSCAN
+import numpy as np
 
 
 # Initialise
@@ -92,7 +97,7 @@ app.layout = html.Div([
             children=[
                 dcc.Upload(
                     id='upload-audio',
-                    children=html.Div(['Drag and Drop or ', html.A('Select Files'), html.Div(id='csv-test')]),
+                    children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
                     style={
                         'width': '100%',
                         'height': '60px',
@@ -146,7 +151,8 @@ app.layout = html.Div([
         ], id='right-column')
     ], id='main-horizontal-layout'),
     html.Div(id='hidden-sample-data'),
-    html.Div(id='csv-dummy-output')
+    html.Div(id='csv-dummy-output'),
+    html.Div(id='csv-test')
 ], id='main-container')
 
 # Callbacks
@@ -387,21 +393,48 @@ def handle_upload(contents, filename, date):
 
         # Use the file format determined from the filename to load the audio file appropriately
         audio = AudioSegment.from_file(temp_file_path, format=file_format)
-        csv_path = process_audio_chunk(audio, output_folder, file_format, os.path.splitext(filename)[0], duration=20)
+        feature_vectors, sound_paths = process_audio_chunk(audio, output_folder, file_format, os.path.splitext(filename)[0], duration=20)
+
+        # Apply UMAP Dimension Reduction
+        reducer = umap.UMAP(n_components=3, random_state=0, n_neighbors=6, min_dist=0)
+        embedding = reducer.fit_transform(feature_vectors)
+
+        # Calculate silhouette score and apply DBSCAN
+        best_eps, best_min_samples, best_score, labels = calculate_silhouette_score(embedding)
+
+        # Create a DataFrame with the results
+        results_df = pd.DataFrame({
+            'x': embedding[:, 0],
+            'y': embedding[:, 1],
+            'z': embedding[:, 2],
+            'class': labels,
+            'sound_path': sound_paths
+        })
+
+        # Save the results to a CSV file
+        results_csv_filename = f'{os.path.splitext(filename)[0]}_umap_dbscan.csv'
+        results_csv_path = os.path.join(TEMP_FOLDER, results_csv_filename)
+        results_df.to_csv(results_csv_path, index=False)
 
         # Clean up the temporary source file
         os.remove(temp_file_path)
 
         # Create a zip file with the chunks
-        zip_path = create_zip_file(output_folder, os.path.splitext(filename)[0])
+        #zip_path = create_zip_file(output_folder, os.path.splitext(filename)[0], results_csv_path)
 
         # Provide a link for the client to download the zip
-        return html.A('Download Chunks', href='/download/{}'.format(os.path.basename(zip_path)))
+        print("i made it here")
+        return html.A('Download Results CSV', href=f'/download/{results_csv_filename}')
 
-# Flask route for serving the zipped audio chunks
-@app.server.route('/download/<path:path>')
-def serve_zip(path):
-    return send_from_directory(TEMP_FOLDER, path, as_attachment=True)
+# Flask route for serving the results CSV file
+@app.server.route('/download/<path:filename>')
+def serve_file(filename):
+    # Ensure the file exists
+    file_path = os.path.join(TEMP_FOLDER, filename)
+    if not os.path.exists(file_path):
+        return f"File not found: {filename}", 404  # Return a 404 if the file doesn't exist
+
+    return send_from_directory(TEMP_FOLDER, filename, as_attachment=True)
 
 # Functions
 def play_sound(sound_file):
@@ -480,6 +513,9 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
     min_max_scaler = MinMaxScaler()
     x_scaled = min_max_scaler.fit_transform(feature_vectors)
     feature_vectors = pd.DataFrame(x_scaled)
+    
+    # Take only the first 13 MFCCs
+    feature_vectors = feature_vectors.iloc[:, :13]
 
     # Save feature vectors to CSV
     paths = pd.DataFrame(sound_paths)
@@ -487,17 +523,60 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
     features_csv_path = os.path.join(output_folder, f'{original_filename}_features.csv')
     df.to_csv(features_csv_path, index=False)
 
-    return features_csv_path
+    return feature_vectors, sound_paths
 
-def create_zip_file(output_folder, original_filename):
+def calculate_silhouette_score(embedding):
+    X = embedding  # Assuming 'embedding' is your UMAP output
+
+    # Define the range for DBSCAN parameters
+    eps_values = np.arange(0.3, 1, 0.1)
+    min_samples_values = range(5, 20, 2)
+
+    best_eps = None
+    best_min_samples = None
+    best_score = -1
+
+    for eps in eps_values:
+        for min_samples in min_samples_values:
+            # Apply DBSCAN clustering
+            dbscan = DBSCAN(eps=eps, min_samples=min_samples).fit(X)
+            labels = dbscan.labels_
+
+            # Calculate the silhouette score, excluding noise points
+            if len(set(labels)) - (1 if -1 in labels else 0) > 1:
+                score = silhouette_score(X[labels != -1], labels[labels != -1])
+                print(f"EPS: {eps}, Min Samples: {min_samples}, Score: {score}, Clusters: {len(set(labels)) - 1}")
+
+                # Check if this score is the best so far
+                if score > best_score:
+                    best_score = score
+                    best_eps = eps
+                    best_min_samples = min_samples
+
+    print(f"Best EPS: {best_eps}, Best Min Samples: {best_min_samples}, Best Silhouette Score: {best_score}")
+
+    # Apply DBSCAN with the best parameters
+    dbscan = DBSCAN(eps=best_eps, min_samples=best_min_samples).fit(X)
+    labels = dbscan.labels_
+
+    return best_eps, best_min_samples, best_score, labels
+
+def create_zip_file(output_folder, original_filename, csv_file_path):
     zip_path = os.path.join(TEMP_FOLDER, f'{original_filename}.zip')
     with zipfile.ZipFile(zip_path, 'w') as zipf:
+        # Add files in the output folder to the ZIP
         for root, dirs, files in os.walk(output_folder):
             for file in files:
                 file_path = os.path.join(root, file)
-                zipf.write(file_path, os.path.relpath(file_path, output_folder))
-    return zip_path
+                # Avoid adding the CSV file again if it's already in the output folder
+                if file_path != csv_file_path:
+                    zipf.write(file_path, os.path.relpath(file_path, output_folder))
 
+        # Add the CSV file to the ZIP if it's not in the output folder
+        if not os.path.exists(os.path.join(output_folder, os.path.basename(csv_file_path))):
+            zipf.write(csv_file_path, os.path.basename(csv_file_path))
+            
+    return zip_path
 
 if __name__ == '__main__':
     app.run_server(debug=True)
