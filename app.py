@@ -152,7 +152,7 @@ app.layout = html.Div([
     ], id='main-horizontal-layout'),
     html.Div(id='hidden-sample-data'),
     html.Div(id='csv-dummy-output'),
-    html.Div(id='csv-test')
+    html.Div(id='csv-test', style={'display': 'none'})
 ], id='main-container')
 
 # Callbacks
@@ -218,9 +218,10 @@ def save_to_csv(n_clicks, checklist_values, samples_json):
      Input('previous-point', 'n_clicks'),
      Input('file-dropdown', 'value'),
      Input('scatter-plot', 'clickData'),
-     Input('class-labels-checklist', 'value')],
+     Input('class-labels-checklist', 'value'),
+     Input('csv-test', 'children')],
     State('hidden-sample-data', 'children'))
-def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickData, selected_labels, samples_json):
+def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickData, selected_labels, csv_path, samples_json):
     global current_cluster_index, sampled_point_index, current_csv_file
     # Trigger context
     ctx = dash.callback_context
@@ -237,7 +238,30 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
     
     samples = json.loads(samples_json)
 
-    if button_id == 'next-point':
+
+    if button_id == 'csv-test' and csv_path:
+        # Read the new CSV file
+        new_df = pd.read_csv(csv_path)
+
+        # Create a new figure based on the new data
+        new_fig = go.Figure()
+        new_fig.update_layout(paper_bgcolor="#171b26")
+        colors = cycle(plotly.colors.sequential.Rainbow)
+        for c in new_df['class'].unique():
+            dfi = new_df[new_df['class'] == c]
+            new_fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
+                                           mode='markers',
+                                           name=str(c),
+                                           customdata=dfi['sound_path'],
+                                           marker=dict(size=2),
+                                           marker_color=next(colors)))
+
+        # Update the sample data state
+        new_samples_json = json.dumps({"data": new_df.to_dict('records'), "current_index": 0})
+
+        return new_fig, "Scatter plot updated from new CSV file.", new_samples_json
+
+    elif button_id == 'next-point':
         sampled_point_index = samples.get('current_index', 0) + 1
         if sampled_point_index >= 10:
             # Move to the next cluster
@@ -423,8 +447,8 @@ def handle_upload(contents, filename, date):
         #zip_path = create_zip_file(output_folder, os.path.splitext(filename)[0], results_csv_path)
 
         # Provide a link for the client to download the zip
-        print("i made it here")
-        return html.A('Download Results CSV', href=f'/download/{results_csv_filename}')
+        #return html.A('Download Results CSV', href=f'/download/{results_csv_filename}')
+        return results_csv_path
 
 # Flask route for serving the results CSV file
 @app.server.route('/download/<path:filename>')
