@@ -42,6 +42,7 @@ import umap
 from sklearn.metrics import silhouette_score
 from sklearn.cluster import DBSCAN
 import numpy as np
+import tempfile
 
 
 # Initialise
@@ -55,6 +56,7 @@ current_cluster_index = 0
 current_csv_file = 'data/umap-Duval-DryA-20min-full-day.csv'
 sampled_point_index = 0
 samples_json = None
+uploaded_files = []
 
 # Assume temporary storage on the server-side
 TEMP_FOLDER = tempfile.mkdtemp()
@@ -109,11 +111,12 @@ app.layout = html.Div([
                         'margin-bottom': '10px',
                     },
                     # Allow multiple files to be uploaded
-                    multiple=False
+                    multiple=True
                 ),
             ],
             type="circle", 
         ),
+            html.Button('Process Uploaded Data', id='process-data-button'),
             dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value'], style={'display': 'none'}),
             html.Div(dcc.Graph(id='scatter-plot', figure=fig), 
                      id='scatterplot-container'),
@@ -152,7 +155,8 @@ app.layout = html.Div([
     ], id='main-horizontal-layout'),
     html.Div(id='hidden-sample-data'),
     html.Div(id='csv-dummy-output'),
-    html.Div(id='csv-test', style={'display': 'none'})
+    html.Div(id='csv-test', style={'display': 'none'}),
+    html.Div(id='temporary-storage', style={'display': 'none'})
 ], id='main-container')
 
 # Callbacks
@@ -390,65 +394,93 @@ def update_spectrogram(play_clicks, next_clicks, samples_json):
     # Return the base64 encoded image as the src of the HTML image tag
     return f'data:image/png;base64,{image_base64}'
 
-# Callback for handling the upload and processing of the audio file
 @app.callback(
-    Output('csv-test', 'children'),
+    Output('temporary-storage', 'children'),
     Input('upload-audio', 'contents'),
     State('upload-audio', 'filename'),
-    State('upload-audio', 'last_modified')
+    State('temporary-storage', 'children')
 )
-def handle_upload(contents, filename, date):
+def store_uploaded_files(contents, filenames, stored_files):
     if contents is not None:
-        content_type, content_string = contents.split(',')
+        # Initialize the list for newly uploaded files
+        new_files = []
 
-        decoded = base64.b64decode(content_string)
+        # Process each file uploaded
+        for content, filename in zip(contents, filenames):
+            data = content.split(',')[1]
+            decoded = base64.b64decode(data)
+            file_path = os.path.join(TEMP_FOLDER, filename)
+            with open(file_path, 'wb') as fp:
+                fp.write(decoded)
+            new_files.append(file_path)
 
-        # Generate a unique folder for the uploaded file chunks
-        output_folder = os.path.join(TEMP_FOLDER, os.path.splitext(filename)[0])
-        os.makedirs(output_folder, exist_ok=True)
+        # Combine new files with already stored ones
+        if stored_files is not None:
+            stored_files = json.loads(stored_files) + new_files
+        else:
+            stored_files = new_files
 
-        # Determine the file format from the file name extension
-        file_format = filename.rsplit('.', 1)[1].lower()
+        return json.dumps(stored_files)  # Store the combined list of file paths
 
-        # Process the uploaded file
-        temp_file_path = os.path.join(output_folder, filename)
-        with open(temp_file_path, 'wb') as temp_file:
-            temp_file.write(decoded)
+    # Return the existing stored files if no new content is uploaded
+    return stored_files
 
-        # Use the file format determined from the filename to load the audio file appropriately
-        audio = AudioSegment.from_file(temp_file_path, format=file_format)
-        feature_vectors, sound_paths = process_audio_chunk(audio, output_folder, file_format, os.path.splitext(filename)[0], duration=20)
 
-        # Apply UMAP Dimension Reduction
-        reducer = umap.UMAP(n_components=3, random_state=0, n_neighbors=6, min_dist=0)
-        embedding = reducer.fit_transform(feature_vectors)
+@app.callback(
+    Output('csv-test', 'children'),
+    Input('process-data-button', 'n_clicks'),
+    State('temporary-storage', 'children'),
+    prevent_initial_call=True
+)
+def process_all_uploaded_files(n_clicks, stored_files):
+    if n_clicks is None or stored_files is None:
+        raise PreventUpdate
 
-        # Calculate silhouette score and apply DBSCAN
-        best_eps, best_min_samples, best_score, labels = calculate_silhouette_score(embedding)
+    file_paths = json.loads(stored_files)
+    combined_feature_vectors = []
+    combined_sound_paths = []
 
-        # Create a DataFrame with the results
-        results_df = pd.DataFrame({
-            'x': embedding[:, 0],
-            'y': embedding[:, 1],
-            'z': embedding[:, 2],
-            'class': labels,
-            'sound_path': sound_paths
-        })
-
-        # Save the results to a CSV file
-        results_csv_filename = f'{os.path.splitext(filename)[0]}_umap_dbscan.csv'
-        results_csv_path = os.path.join(TEMP_FOLDER, results_csv_filename)
-        results_df.to_csv(results_csv_path, index=False)
+    for file_path in file_paths:
+        audio = AudioSegment.from_file(file_path, format=file_path.rsplit('.', 1)[1].lower())
+        feature_vectors, sound_paths = process_audio_chunk(audio, os.path.dirname(file_path), file_path.rsplit('.', 1)[1].lower(), os.path.splitext(file_path)[0], duration=20)
+        
+        # Stack feature_vectors and extend sound_paths
+        combined_feature_vectors.append(feature_vectors)
+        combined_sound_paths.extend(sound_paths)
 
         # Clean up the temporary source file
-        os.remove(temp_file_path)
+        os.remove(file_path)
 
-        # Create a zip file with the chunks
-        #zip_path = create_zip_file(output_folder, os.path.splitext(filename)[0], results_csv_path)
+    # Convert list of arrays to a single 2D array for feature_vectors
+    combined_feature_vectors = np.vstack(combined_feature_vectors)
 
-        # Provide a link for the client to download the zip
-        #return html.A('Download Results CSV', href=f'/download/{results_csv_filename}')
-        return results_csv_path
+    # Apply UMAP Dimension Reduction
+    reducer = umap.UMAP(n_components=3, random_state=0, n_neighbors=6, min_dist=0)
+    embedding = reducer.fit_transform(combined_feature_vectors)
+
+    # Calculate silhouette score and apply DBSCAN
+    best_eps, best_min_samples, best_score, labels = calculate_silhouette_score(embedding)
+
+    # Create a DataFrame with the results
+    if len(embedding) != len(combined_sound_paths):
+        return "Error: Mismatch in lengths of embedding and sound paths."
+
+    results_df = pd.DataFrame({
+        'x': embedding[:, 0],
+        'y': embedding[:, 1],
+        'z': embedding[:, 2],
+        'class': labels,
+        'sound_path': combined_sound_paths
+    })
+
+    # Save the results to a CSV file
+    results_csv_filename = 'combined_umap_dbscan.csv'
+    results_csv_path = os.path.join(TEMP_FOLDER, results_csv_filename)
+    results_df.to_csv(results_csv_path, index=False)
+
+    # Clear the global list after processing
+    uploaded_files.clear()
+    return results_csv_path
 
 # Flask route for serving the results CSV file
 @app.server.route('/download/<path:filename>')
