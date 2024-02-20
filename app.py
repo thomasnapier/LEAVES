@@ -92,6 +92,83 @@ app = dash.Dash(__name__, external_stylesheets=["assets\\styles.css"])
 
 app.layout = html.Div([
     html.Div('A20AudioLabeller', id='top-banner'),  # Top banner with the app title
+    html.Button('⚙️', id='open-settings', style={'position': 'absolute', 'top': '10px', 'right': '10px'}),
+    # Settings Modal Structure
+    html.Div(
+        [
+            html.Div(
+                [
+                    html.H2("Software Configuration", style={'textAlign': 'center', 'color': '#FFFFFF'}),
+                    html.Hr(style={'background-color': '#FFFFFF'}),
+
+                    html.H4("Preprocessing"),
+                    dcc.Checklist(
+                        options=[
+                            {'label': ' Systematic Data Sampling', 'value': 'SDS'},
+                            {'label': ' Short Term Windowing', 'value': 'STW'}
+                        ],
+                        id='preprocessing-options'
+                    ),
+                    dcc.Slider(id='data-sampling-slider', min=0, max=40, value=20, step=1, marks={i: f'{i} min' for i in range(0, 41, 5)}),
+                    dcc.Input(id='windowing-input', type='number', value=4.5, step=0.5, min=3.5, max=5.5),
+                    dcc.Tabs(
+                        id="denoising-tabs",
+                        value='none',
+                        children=[
+                            dcc.Tab(label='None', value='none'),
+                            dcc.Tab(label='Wavelet-based', value='wavelet'),
+                            dcc.Tab(label='Low-pass', value='low-pass'),
+                            dcc.Tab(label='High-pass', value='high-pass'),
+                            dcc.Tab(label='Band-pass', value='band-pass'),
+                        ]
+                    ),
+                    html.Hr(),
+
+                    html.H4("Feature Extraction"),
+                    dcc.Checklist(
+                        options=[
+                            {'label': ' Min-Max Normalisation', 'value': 'MMN'},
+                            {'label': ' Include MFCC Derivatives', 'value': 'IMD'}
+                        ],
+                        id='feature-extraction-options'
+                    ),
+                    html.Hr(),
+
+                    html.H4("Complexity Reduction"),
+                    dcc.Tabs(
+                        id="complexity-tabs",
+                        value='UMAP',
+                        children=[
+                            dcc.Tab(label='UMAP', value='UMAP'),
+                            dcc.Tab(label='t-SNE', value='t-SNE'),
+                            dcc.Tab(label='PCA', value='PCA'),
+                        ]
+                    ),
+                    dcc.Slider(id='n-neighbours-slider', min=0, max=100, value=15, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
+                    dcc.Slider(id='min-dist-slider', min=0, max=1, value=0.1, step=0.1, marks={i/10: str(i/10) for i in range(0, 11, 1)}, tooltip={"placement": "bottom", "always_visible": True}),
+                    html.Hr(),
+
+                    html.H4("Clustering"),
+                    dcc.Dropdown(
+                        id='clustering-algorithm-dropdown',
+                        options=[
+                            {'label': 'DBScan', 'value': 'DBScan'},
+                            {'label': 'k-means', 'value': 'k-means'},
+                            {'label': 'Agglomerative', 'value': 'Agglomerative'},
+                        ],
+                        value='DBScan'
+                    ),
+                    dcc.Slider(id='eps-slider', min=0, max=5, value=0.5, step=0.1, marks={i/10: str(i/10) for i in range(0, 51, 5)}, tooltip={"placement": "bottom", "always_visible": True}),
+                    dcc.Slider(id='min-samples-slider', min=0, max=100, value=5, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
+
+                    html.Button('Close', id='close-settings', style={'margin': '20px'}),
+                ],
+                style={'padding': '20px', 'color': '#FFFFFF', 'background-color': '#171b26'}
+            ),
+        ],
+        id='settings-modal',
+        style={'display': 'none', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': '#171b26', 'border': '2px solid #ddd', 'border-radius': '5px', 'color': '#FFFFFF'}
+    ),
     html.Div([  # Main content area
         html.Div([  # Left column container
         dcc.Loading(  # Add the Loading component
@@ -113,6 +190,7 @@ app.layout = html.Div([
                     # Allow multiple files to be uploaded
                     multiple=True
                 ),
+                html.Div(id='upload-file-info', style={'white-space': 'pre-line'}),
             ],
             type="circle", 
         ),
@@ -123,13 +201,13 @@ app.layout = html.Div([
         ], id='left-column'),  # Closing left column
         html.Div([  # Right column container
             html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
-            html.Div(id='audio-status', children='No audio being played currently.'),
+            html.Img(id='mel-spectrogram', src=''),
             html.Div([  # Control buttons
                 html.Button('◁', id='previous-point'),
-                html.Button('⏯', id='play-audio'),
+                html.Button('||', id='play-audio'),
                 html.Button('▷', id='next-point'),
             ], id='button-group'),
-            html.Img(id='mel-spectrogram', src=''),
+            html.Div(id='audio-status', children='No audio being played currently.'),
             html.Div([
             html.Div(id='checklist-title', children='Classes:'),
             dcc.Checklist(id='class-labels-checklist',
@@ -155,9 +233,31 @@ app.layout = html.Div([
     ], id='main-horizontal-layout'),
     html.Div(id='hidden-sample-data'),
     html.Div(id='csv-dummy-output'),
-    html.Div(id='csv-test', style={'display': 'none'}),
+    html.Div(id='csv-test'),
     html.Div(id='temporary-storage', style={'display': 'none'})
 ], id='main-container')
+
+@app.callback(
+    Output('settings-modal', 'style'),
+    [Input('open-settings', 'n_clicks'), Input('close-settings', 'n_clicks')],
+    [State('settings-modal', 'style')]
+)
+def toggle_modal(open_clicks, close_clicks, style):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if button_id == 'open-settings' and open_clicks:
+        return {'display': 'block', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': '#171b26', 'border': '2px solid #ddd', 'border-radius': '5px', 'color': '#FFFFFF'}
+
+    elif button_id == 'close-settings' and close_clicks:
+        return {'display': 'none'}
+
+    return style
+
 
 # Callbacks
 @app.callback(
@@ -402,29 +502,26 @@ def update_spectrogram(play_clicks, next_clicks, samples_json):
 )
 def store_uploaded_files(contents, filenames, stored_files):
     if contents is not None:
-        # Initialize the list for newly uploaded files
-        new_files = []
-
-        # Process each file uploaded
-        for content, filename in zip(contents, filenames):
-            data = content.split(',')[1]
-            decoded = base64.b64decode(data)
-            file_path = os.path.join(TEMP_FOLDER, filename)
-            with open(file_path, 'wb') as fp:
-                fp.write(decoded)
-            new_files.append(file_path)
-
-        # Combine new files with already stored ones
-        if stored_files is not None:
-            stored_files = json.loads(stored_files) + new_files
+        # Use a persistent file to store the paths
+        if stored_files is None:
+            temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.txt')
+            temp_file_path = temp_file.name
+            temp_file.close()
         else:
-            stored_files = new_files
+            temp_file_path = stored_files
 
-        return json.dumps(stored_files)  # Store the combined list of file paths
+        with open(temp_file_path, 'a') as temp_file:
+            for content, filename in zip(contents, filenames):
+                data = content.split(',')[1]
+                decoded = base64.b64decode(data)
+                file_path = os.path.join(TEMP_FOLDER, filename)
+                with open(file_path, 'wb') as fp:
+                    fp.write(decoded)
+                temp_file.write(file_path + '\n')
 
-    # Return the existing stored files if no new content is uploaded
+        return temp_file_path
+
     return stored_files
-
 
 @app.callback(
     Output('csv-test', 'children'),
@@ -436,7 +533,10 @@ def process_all_uploaded_files(n_clicks, stored_files):
     if n_clicks is None or stored_files is None:
         raise PreventUpdate
 
-    file_paths = json.loads(stored_files)
+    # Read file paths from the temporary file
+    with open(stored_files, 'r') as file:
+        file_paths = file.read().splitlines()
+
     combined_feature_vectors = []
     combined_sound_paths = []
 
@@ -491,6 +591,30 @@ def serve_file(filename):
         return f"File not found: {filename}", 404  # Return a 404 if the file doesn't exist
 
     return send_from_directory(TEMP_FOLDER, filename, as_attachment=True)
+
+@app.callback(
+    Output('upload-file-info', 'children'),
+    [Input('upload-audio', 'filename')],
+    [State('temporary-storage', 'children')]
+)
+def update_file_info(filenames, stored_files):
+    if not filenames:
+        return 'No new files uploaded.'
+
+    # Read the stored file paths
+    all_files = []
+    if stored_files:
+        with open(stored_files, 'r') as file:
+            all_files = file.read().splitlines()
+
+    # Combine the new filenames with the existing ones
+    new_files = [os.path.basename(f) for f in filenames]  # Extract just the file names
+    all_files += new_files
+
+    # Format the display string
+    display_str = "" #f"Total Files Uploaded: {len(all_files)}".join(all_files)
+
+    return display_str
 
 # Functions
 def play_sound(sound_file):
@@ -612,7 +736,7 @@ def calculate_silhouette_score(embedding):
     print(f"Best EPS: {best_eps}, Best Min Samples: {best_min_samples}, Best Silhouette Score: {best_score}")
 
     # Apply DBSCAN with the best parameters
-    dbscan = DBSCAN(eps=best_eps, min_samples=best_min_samples).fit(X)
+    dbscan = DBSCAN(eps=0.6, min_samples=6).fit(X)
     labels = dbscan.labels_
 
     return best_eps, best_min_samples, best_score, labels

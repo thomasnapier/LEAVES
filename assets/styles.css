@@ -89,6 +89,7 @@ button {
 /* Additional styles to adjust the button group at the top of the right column */
 #button-group, #audio-status {
     width: 100%; /* Full width to align with the right column */
+    height: 40px;
     margin-bottom: 20px; /* Spacing after the button group */
     text-align: center;
 }
@@ -96,6 +97,84 @@ button {
 #hidden-sample-data{
     display: none;
 }
+
+button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #4A76A8; /* Adjusted for lighter contrast against #171b26 background */
+    color: #FFFFFF; /* Keeping text color white for readability */
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Slightly lighter shadow for subtlety */
+    padding: 10px 20px; /* Adjusted padding for a more balanced spacing */
+    min-width: 10ch;
+    min-height: 40px; /* Slightly reduced for a more compact look */
+    cursor: pointer;
+    transition: background-color 220ms ease-in-out, box-shadow 220ms ease-in-out;
+}
+
+button:hover {
+    background-color: #5A8AC8; /* Lighter shade for hover state for better interaction feedback */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); /* Enhanced shadow on hover for a "lifted" effect */
+}
+
+button:focus {
+    outline-style: solid;
+    outline-color: transparent;
+    box-shadow: 0 0 0 4px #3E68FF; /* Keeping focus indicator for accessibility, adjusted color for visibility */
+}
+
+#checklist-container{
+    border: #171b26;
+}
+
+.modal {
+    position: fixed;
+    z-index: 1001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px; /* Adjust based on preference */
+}
+
+.modal-content {
+    background-color: #202833; /* Slightly lighter than the main background for contrast */
+    color: #FFFFFF; /* White text for readability */
+    border-radius: 5px;
+    padding: 20px;
+}
+
+.modal-content h2, .modal-content h4 {
+    color: #FFFFFF; /* Ensure headings are also white */
+}
+
+.modal-content hr {
+    border-top: 1px solid #FFFFFF; /* Light horizontal rules for separation */
+}
+
+/* Style for the close button */
+#close-settings {
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    padding: 5px 10px;
+    margin-top: -40px; /* Align to the top right corner */
+    margin-right: -20px; /* Ensure some space from the right edge */
+}
+
+  
 
 /* Media queries for responsiveness */
 @media only screen and (max-width: 768px) {
