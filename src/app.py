@@ -1,8 +1,8 @@
 """
-Program Name: A2OAudioLabeller
+Program Name: LEAVES (Large-scale Ecoacoustics Annotation and Visualisation with Efficient Segmentation)
 Developer: Thomas Napier
 Organisation: James Cook University
-GitHub: https://github.com/thomasnapier/A2OAudioLabeller
+GitHub: https://github.com/thomasnapier/LEAVES
 Description: This is a program designed to improve the audio labelling efficiency of
 samples derived from the Australian Acoustic Observatory (A2O)
 """
@@ -47,13 +47,13 @@ import tempfile
 
 # Initialise
 pygame.mixer.init()
-df = pd.read_csv('data/umap-Duval-DryA-20min-full-day.csv')
+df = pd.read_csv('data/Undara-DryB.csv')
 label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
                  "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
                  "Wind (Strong)", "Wind (Light)"]
 file_options = [{'label': file.split("\\")[-1], 'value': file} for file in glob.glob("data/*.csv")]
 current_cluster_index = 0
-current_csv_file = 'data/umap-Duval-DryA-20min-full-day.csv'
+current_csv_file = 'data/Undara-DryB.csv'
 sampled_point_index = 0
 samples_json = None
 uploaded_files = []
