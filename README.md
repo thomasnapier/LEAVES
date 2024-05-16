@@ -1,4 +1,4 @@
-<p align="center"><img width=12.5% src="https://github.com/thomasnapier/LEAVES/tree/main/src/assets/logos/logo.png"></p>
+<p align="center"><img width=12.5% src="https://github.com/thomasnapier/LEAVES/blob/main/src/assets/logos/logo.png"></p>
 
 # LEAVES: Large-scale Ecoacoustics Annotation and Visualisation with Efficient Segmentation
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
