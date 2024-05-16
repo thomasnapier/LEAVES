@@ -1,14 +1,14 @@
-<p align="center"><img width=12.5% src="https://github.com/thomasnapier/LEAVES/blob/main/src/assets/logos/logo.png"></p>
+<p align="center"><img width=30% src="https://github.com/thomasnapier/LEAVES/blob/main/src/assets/logos/logo.png"></p>
 
 # LEAVES: Large-scale Ecoacoustics Annotation and Visualisation with Efficient Segmentation
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
 ![Python](https://img.shields.io/badge/python-v3.6+-blue.svg)
 ![Dependencies](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen.svg)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**Description**: LEAVES is an advanced tool designed to streamline the process of annotating and visualizing large-scale natural soundscape datasets. With the accelerating decline in global biodiversity, monitoring and conserving ecosystems has never been more critical. LEAVES leverages cutting-edge machine learning and efficient data processing techniques to make ecoacoustic analysis faster, more accurate, and accessible to researchers and citizen scientists alike.
+**Description**: LEAVES is an advanced tool designed to streamline the process of annotating and visualizing large-scale natural soundscape datasets. It leverages cutting-edge machine learning and efficient data processing techniques to make ecoacoustic analysis faster, more accurate, and accessible to researchers and citizen scientists alike.
 
-**Features**: 
+**Key Features**: 
 - Efficiency-Optimized Labelling: Significantly reduces the time required to annotate large datasets.
 - Modular Design: Adaptable to a range of ecoacoustic research needs with customizable settings.
 - User-Friendly Interface: Intuitive controls and visualizations make it accessible to users of all technical levels.
