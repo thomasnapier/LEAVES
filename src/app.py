@@ -71,7 +71,7 @@ for c in df['class'].unique():
                                customdata=dfi['sound_path'],
                                marker=dict(size=2),
                                marker_color=next(colors)))
-    
+
 for label_option in label_options:
     if label_option.lower().replace(' ', '_') not in df.columns:
         df[label_option.lower().replace(' ', '_')] = 0
@@ -88,10 +88,17 @@ fig.update_layout(
 )
 
 # Define app and layout
-app = dash.Dash(__name__, external_stylesheets=["assets\\styles.css"])
+app = dash.Dash(__name__, external_stylesheets=["assets/styles.css"])
+
+# Load the logo image
+logo_path = 'assets/logos/logo.png'
+encoded_logo = base64.b64encode(open(logo_path, 'rb').read()).decode('ascii')
 
 app.layout = html.Div([
-    html.Div('A20AudioLabeller', id='top-banner'),  # Top banner with the app title
+    html.Div([
+        html.Img(src=f'data:image/png;base64,{encoded_logo}', id='logo'),
+        html.Span('LEAVES', id='top-banner-title')
+    ], id='top-banner'),  # Top banner with the app title and logo
     html.Button('⚙️', id='open-settings', style={'position': 'absolute', 'top': '10px', 'right': '10px'}),
     # Settings Modal Structure
     html.Div(
@@ -171,66 +178,60 @@ app.layout = html.Div([
     ),
     html.Div([  # Main content area
         html.Div([  # Left column container
-        dcc.Loading(  # Add the Loading component
-            id="loading-upload",
-            children=[
-                dcc.Upload(
-                    id='upload-audio',
-                    children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-                    style={
-                        'width': '100%',
-                        'height': '60px',
-                        'lineHeight': '60px',
-                        'borderWidth': '1px',
-                        'borderStyle': 'dashed',
-                        'borderRadius': '5px',
-                        'textAlign': 'center',
-                        'margin-bottom': '10px',
-                    },
-                    # Allow multiple files to be uploaded
-                    multiple=True
-                ),
-                html.Div(id='upload-file-info', style={'white-space': 'pre-line'}),
-            ],
-            type="circle", 
-        ),
+            dcc.Loading(  # Add the Loading component
+                id="loading-upload",
+                children=[
+                    dcc.Upload(
+                        id='upload-audio',
+                        children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
+                        style={
+                            'width': '100%',
+                            'height': '60px',
+                            'lineHeight': '60px',
+                            'borderWidth': '1px',
+                            'borderStyle': 'dashed',
+                            'borderRadius': '5px',
+                            'textAlign': 'center',
+                            'margin-bottom': '10px',
+                        },
+                        # Allow multiple files to be uploaded
+                        multiple=True
+                    ),
+                    html.Div(id='upload-file-info', style={'white-space': 'pre-line'}),
+                ],
+                type="circle",
+            ),
             html.Button('Process Uploaded Data', id='process-data-button'),
             dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value'], style={'display': 'none'}),
-            html.Div(dcc.Graph(id='scatter-plot', figure=fig), 
+            html.Div(dcc.Graph(id='scatter-plot', figure=fig),
                      id='scatterplot-container'),
-        ], id='left-column'),  # Closing left column
-        html.Div([  # Right column container
-            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
-            html.Img(id='mel-spectrogram', src=''),
-            html.Div([  # Control buttons
-                html.Button('◁', id='previous-point'),
-                html.Button('||', id='play-audio'),
-                html.Button('▷', id='next-point'),
-            ], id='button-group'),
-            html.Div(id='audio-status', children='No audio being played currently.'),
             html.Div([
             html.Div(id='checklist-title', children='Classes:'),
-            dcc.Checklist(id='class-labels-checklist',
-                  options=[
-                      {'label': 'Background Silence', 'value': 'Background Silence'},
-                      {'label': 'Birds', 'value': 'Birds'},
-                      {'label': 'Frogs', 'value': 'Frogs'},
-                      {'label': 'Human Speech', 'value': 'Human Speech'},
-                      {'label': 'Insects', 'value': 'Insects'},
-                      {'label': 'Mammals', 'value': 'Mammals'},
-                      {'label': 'Misc/Uncertain', 'value': 'Misc/Uncertain'},
-                      {'label': 'Rain (Heavy)', 'value': 'Rain (Heavy)'},
-                      {'label': 'Rain (Light)', 'value': 'Rain (Light)'},
-                      {'label': 'Vehicles (Aircraft/Cars)', 'value': 'Vehicles (Aircraft/Cars)'},
-                      {'label': 'Wind (Strong)', 'value': 'Wind (Strong)'},
-                      {'label': 'Wind (Light)', 'value': 'Wind (Light)'},
-                      #TODO: Make this list user-defined and/or enable users to make changes
-                        ],value=[]),
-                html.Div([
+            html.Div([
+                dcc.Checklist(id='class-labels-checklist',
+                              options=[{'label': label, 'value': label} for label in label_options],
+                              value=[],
+                              labelStyle={'display': 'inline-block', 'margin-right': '10px'})
+            ], id='annotation-tags-container')
+        ], id='checklist-container'),
+        html.Div([
             html.Button('Save Data File', id='control-button')
-        ])], id='checklist-container'),
-        ], id='right-column')
+        ]),
+        ], id='left-column'),  # Closing left column
+        html.Div([  # Main window
+            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
+            html.Img(id='mel-spectrogram', src=''),
+            html.Img(id='waveform-plot', src=''),
+        ], id='main-window'),
     ], id='main-horizontal-layout'),
+    html.Div([  # Bottom timeline container
+        html.Div(id='audio-status', children='No audio being played currently.'),
+        html.Div([  # Control buttons
+            html.Button('◁', id='previous-point'),
+            html.Button('||', id='play-audio'),
+            html.Button('▷', id='next-point'),
+        ], id='button-group'),
+    ], id='bottom-timeline'),
     html.Div(id='hidden-sample-data'),
     html.Div(id='csv-dummy-output'),
     html.Div(id='csv-test'),
@@ -257,7 +258,6 @@ def toggle_modal(open_clicks, close_clicks, style):
         return {'display': 'none'}
 
     return style
-
 
 # Callbacks
 @app.callback(
@@ -461,18 +461,18 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
 
     return fig, status, samples_json
 
-@app.callback(Output('mel-spectrogram', 'src'),
+@app.callback([Output('mel-spectrogram', 'src'),
+               Output('waveform-plot', 'src')],
               [Input('play-audio', 'n_clicks'),
                Input('next-point', 'n_clicks')],
               [State('hidden-sample-data', 'children')])
-def update_spectrogram(play_clicks, next_clicks, samples_json):
+def update_plots(play_clicks, next_clicks, samples_json):
     # Clear previous figure
     plt.clf()
     matplotlib.pyplot.close()
 
-    plt.figure(figsize=(12, 3))
     if samples_json is None:
-        return dash.no_update
+        return dash.no_update, dash.no_update
 
     samples = json.loads(samples_json)
     current_sample = samples["data"][samples["current_index"]]
@@ -480,19 +480,30 @@ def update_spectrogram(play_clicks, next_clicks, samples_json):
 
     # Generate Mel spectrogram using matplotlib and soundfile
     data, samplerate = sf.read(sound_file)
-    Pxx, freqs, bins, im = plt.specgram(data, NFFT=1024, Fs=samplerate, noverlap=512)
-    plt.title('Spectrogram')
+    plt.figure(figsize=(12, 3))
+    plt.specgram(data, NFFT=1024, Fs=samplerate, noverlap=512)
+    plt.tight_layout()
 
     # Convert the matplotlib figure to a PNG image
     buf = BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
-    
-    # Encode the image as base64
-    image_base64 = base64.b64encode(buf.read()).decode()
+    mel_spectrogram_base64 = base64.b64encode(buf.read()).decode()
 
-    # Return the base64 encoded image as the src of the HTML image tag
-    return f'data:image/png;base64,{image_base64}'
+    # Generate waveform plot using matplotlib and soundfile
+    plt.figure(figsize=(12, 3))
+    plt.plot(data)
+
+    plt.tight_layout()
+
+    # Convert the matplotlib figure to a PNG image
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    waveform_base64 = base64.b64encode(buf.read()).decode()
+
+    # Return the base64 encoded images as the src of the HTML image tags
+    return f'data:image/png;base64,{mel_spectrogram_base64}', f'data:image/png;base64,{waveform_base64}'
 
 @app.callback(
     Output('temporary-storage', 'children'),
@@ -760,4 +771,5 @@ def create_zip_file(output_folder, original_filename, csv_file_path):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+
 

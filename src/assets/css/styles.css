@@ -1,4 +1,4 @@
-html{
+tml {
     margin: 0;
     padding: 0;
 }
@@ -17,7 +17,6 @@ body {
     min-height: 100vh;
 }
 
-/* Banner styling */
 #top-banner {
     background-color: #333;
     padding: 10px 20px;
@@ -25,77 +24,109 @@ body {
     font-size: 2em;
     text-align: left;
     width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+#logo {
+    width: 5%;
+}
+
+#top-banner-title {
+    flex-grow: 1;
+    padding-left: 10px;
 }
 
 * {
-    box-sizing: border-box; /* This ensures that padding and border are included in the total width and height */
+    box-sizing: border-box;
+}
+
+#main-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 #main-horizontal-layout {
     display: flex;
-    flex-wrap: nowrap;
-    overflow: hidden; /* This will hide any overflowing content */
+    flex: 1;
+    overflow: hidden;
 }
 
-#left-column, #right-column {
-    flex: 1; /* This will equally divide the space for both columns */
+#left-column {
+    flex: 1 1 25%;
     padding: 20px;
-    max-width: calc(50% - 40px); /* Subtract the padding from the max-width */
-    box-sizing: border-box;
+    overflow: auto;
+    border-right: 1px solid #444;
 }
 
-/* Project paragraph styling */
-#project-info {
+#main-window {
+    flex: 1 1 55%;
+    padding: 20px;
+    overflow: auto;
+}
+
+#bottom-timeline {
+    flex: 0 0 auto;
+    padding: 20px;
+    border-top: 1px solid #444;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#button-group {
+    display: flex;
+    justify-content: center;
     margin-bottom: 20px;
 }
 
-/* List of options styling */
-#options-list {
-    list-style: none;
-    padding: 0;
-    margin-top: 20px;
-}
-
-/* Buttons styling */
-button {
-    font-size: 1em;
-    margin: 5px;
-    padding: 10px 20px;
-}
-
-/* Audio status text */
-#audio-status {
-    font-size: 1.5em;
-    margin-bottom: 20px;
-}
-
-#checklist-container{
-    column-count: 3; /* Adjust the number as needed for more or fewer columns */
-    column-gap: 20px; /* Adjust the gap between columns */
+#checklist-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     width: 100%;
 }
 
-/* Correct spectrogram ID if necessary */
-#mel-spectrogram {
-    width: 100%; /* Full width of the right column */
-    margin-bottom: 20px;
+#annotation-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
-/* Ensure the elements fit in the respective columns */
-#scatterplot-container, #file-dropdown, #checklist-container {
-    flex: 1; /* Grow to fill the space in the flex container */
-}
-
-/* Additional styles to adjust the button group at the top of the right column */
-#button-group, #audio-status {
-    width: 100%; /* Full width to align with the right column */
-    height: 40px;
-    margin-bottom: 20px; /* Spacing after the button group */
-    text-align: center;
-}
-
-#hidden-sample-data{
+#annotation-tags-container .dash-checkbox {
     display: none;
+}
+
+#annotation-tags-container label {
+    background-color: #4A76A8;
+    color: #FFFFFF;
+    padding: 5px 10px;
+    margin: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.3s;
+}
+
+#annotation-tags-container label:hover {
+    background-color: #5A8AC8;
+}
+
+#annotation-tags-container input[type="checkbox"]:checked + label {
+    background-color: #5A8AC8;
+    border: 2px solid #FFFFFF;
+}
+
+#hidden-sample-data, #csv-dummy-output, #csv-test, #temporary-storage {
+    display: none;
+}
+
+#mel-spectrogram, #waveform-plot {
+    width: 100%;
+    height: auto;
+    margin-bottom: 20px;
 }
 
 button {
@@ -123,10 +154,6 @@ button:focus {
     outline-style: solid;
     outline-color: transparent;
     box-shadow: 0 0 0 4px #3E68FF; /* Keeping focus indicator for accessibility, adjusted color for visibility */
-}
-
-#checklist-container{
-    border: #171b26;
 }
 
 .modal {
@@ -173,8 +200,6 @@ button:focus {
     margin-top: -40px; /* Align to the top right corner */
     margin-right: -20px; /* Ensure some space from the right edge */
 }
-
-  
 
 /* Media queries for responsiveness */
 @media only screen and (max-width: 768px) {
