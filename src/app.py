@@ -45,8 +45,10 @@ import numpy as np
 import tempfile
 
 
-# Initialise
+# Initialise pygame mixer
 pygame.mixer.init()
+
+# Load data
 df = pd.read_csv('data/Undara-DryB.csv')
 label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
                  "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
@@ -58,37 +60,58 @@ sampled_point_index = 0
 samples_json = None
 uploaded_files = []
 
-# Assume temporary storage on the server-side
+# Temporary folder for server-side storage
 TEMP_FOLDER = tempfile.mkdtemp()
-
-colors = cycle(plotly.colors.sequential.Rainbow)
-fig = go.Figure()
-for c in df['class'].unique():
-    dfi = df[df['class'] == c]
-    fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
-                               mode='markers',
-                               name=str(c),
-                               customdata=dfi['sound_path'],
-                               marker=dict(size=2),
-                               marker_color=next(colors)))
 
 for label_option in label_options:
     if label_option.lower().replace(' ', '_') not in df.columns:
         df[label_option.lower().replace(' ', '_')] = 0
 
-fig.update_layout(
-    paper_bgcolor="#171b26",
-    legend_orientation='h',  # Horizontal orientation
-    legend=dict(
-        x=0,  # Adjust legend X position
-        y=-0.5,  # Adjust legend Y position to be below the plot
-        xanchor='left',
-        yanchor='top'
-    )
-)
+# Initialize the DataFrame
+columns = ['embedding_x', 'embedding_y', 'embedding_z', 'sound_path']
+columns.extend([label.lower().replace(' ', '_') for label in label_options])
+annotations_df = pd.DataFrame(columns=columns)
+
+def save_annotations_to_csv(df, filepath):
+    df.to_csv(filepath, index=False)
+
+def create_figure(df):
+    # Initialize colors and figure
+    classes = df['class'].unique()
+    colors = plt.cm.get_cmap('tab10', len(classes))
+    fig = go.Figure()
+    for i, c in enumerate(classes):
+        dfi = df[df['class'] == c]
+        fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
+                                mode='markers',
+                                name="Class " + str(c),
+                                customdata=dfi['sound_path'],
+                                marker=dict(size=5, line=dict(width=0.1, color='black')),
+                                marker_color=[f'rgba{colors(i)}' for _ in range(len(dfi))]))
+        
+    fig.update_layout(
+        paper_bgcolor="var(--background-color)",
+        legend_orientation='v',
+        autosize=True,
+            scene=dict(
+                xaxis=dict(title='X', titlefont=dict(size=12), gridcolor='gray', gridwidth=1),
+                yaxis=dict(title='Y', titlefont=dict(size=12), gridcolor='gray', gridwidth=1),
+                zaxis=dict(title='Z', titlefont=dict(size=12), gridcolor='gray', gridwidth=1)
+            ),
+            margin=dict(l=0, r=0, b=0, t=40),
+                legend=dict(
+                x=0.7,
+                y=0.5,
+                font=dict(size=10),
+                bgcolor='rgba(255,255,255,0.5)'
+            )
+        )
+    
+    return fig
 
 # Define app and layout
-app = dash.Dash(__name__, external_stylesheets=["assets/styles.css"])
+fig = create_figure(df)
+app = dash.Dash(__name__, external_stylesheets=["assets/css/styles.css"])
 
 # Load the logo image
 logo_path = 'assets/logos/logo.png'
@@ -98,87 +121,75 @@ app.layout = html.Div([
     html.Div([
         html.Img(src=f'data:image/png;base64,{encoded_logo}', id='logo'),
         html.Span('LEAVES', id='top-banner-title')
-    ], id='top-banner'),  # Top banner with the app title and logo
+    ], id='top-banner'),
     html.Button('⚙️', id='open-settings', style={'position': 'absolute', 'top': '10px', 'right': '10px'}),
-    # Settings Modal Structure
-    html.Div(
-        [
-            html.Div(
-                [
-                    html.H2("Software Configuration", style={'textAlign': 'center', 'color': '#FFFFFF'}),
-                    html.Hr(style={'background-color': '#FFFFFF'}),
-
-                    html.H4("Preprocessing"),
-                    dcc.Checklist(
-                        options=[
-                            {'label': ' Systematic Data Sampling', 'value': 'SDS'},
-                            {'label': ' Short Term Windowing', 'value': 'STW'}
-                        ],
-                        id='preprocessing-options'
-                    ),
-                    dcc.Slider(id='data-sampling-slider', min=0, max=40, value=20, step=1, marks={i: f'{i} min' for i in range(0, 41, 5)}),
-                    dcc.Input(id='windowing-input', type='number', value=4.5, step=0.5, min=3.5, max=5.5),
-                    dcc.Tabs(
-                        id="denoising-tabs",
-                        value='none',
-                        children=[
-                            dcc.Tab(label='None', value='none'),
-                            dcc.Tab(label='Wavelet-based', value='wavelet'),
-                            dcc.Tab(label='Low-pass', value='low-pass'),
-                            dcc.Tab(label='High-pass', value='high-pass'),
-                            dcc.Tab(label='Band-pass', value='band-pass'),
-                        ]
-                    ),
-                    html.Hr(),
-
-                    html.H4("Feature Extraction"),
-                    dcc.Checklist(
-                        options=[
-                            {'label': ' Min-Max Normalisation', 'value': 'MMN'},
-                            {'label': ' Include MFCC Derivatives', 'value': 'IMD'}
-                        ],
-                        id='feature-extraction-options'
-                    ),
-                    html.Hr(),
-
-                    html.H4("Complexity Reduction"),
-                    dcc.Tabs(
-                        id="complexity-tabs",
-                        value='UMAP',
-                        children=[
-                            dcc.Tab(label='UMAP', value='UMAP'),
-                            dcc.Tab(label='t-SNE', value='t-SNE'),
-                            dcc.Tab(label='PCA', value='PCA'),
-                        ]
-                    ),
-                    dcc.Slider(id='n-neighbours-slider', min=0, max=100, value=15, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
-                    dcc.Slider(id='min-dist-slider', min=0, max=1, value=0.1, step=0.1, marks={i/10: str(i/10) for i in range(0, 11, 1)}, tooltip={"placement": "bottom", "always_visible": True}),
-                    html.Hr(),
-
-                    html.H4("Clustering"),
-                    dcc.Dropdown(
-                        id='clustering-algorithm-dropdown',
-                        options=[
-                            {'label': 'DBScan', 'value': 'DBScan'},
-                            {'label': 'k-means', 'value': 'k-means'},
-                            {'label': 'Agglomerative', 'value': 'Agglomerative'},
-                        ],
-                        value='DBScan'
-                    ),
-                    dcc.Slider(id='eps-slider', min=0, max=5, value=0.5, step=0.1, marks={i/10: str(i/10) for i in range(0, 51, 5)}, tooltip={"placement": "bottom", "always_visible": True}),
-                    dcc.Slider(id='min-samples-slider', min=0, max=100, value=5, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
-
-                    html.Button('Close', id='close-settings', style={'margin': '20px'}),
+    html.Button('🌙/☀️', id='theme-toggle', style={'position': 'absolute', 'top': '10px', 'right': '100px'}),
+    html.Div([
+        html.Div([
+            html.H2("Software Configuration", style={'textAlign': 'center', 'color': 'var(--text-color)'}),
+            html.Hr(style={'background-color': 'var(--text-color)'}),
+            html.H4("Preprocessing"),
+            dcc.Checklist(
+                options=[
+                    {'label': ' Systematic Data Sampling', 'value': 'SDS'},
+                    {'label': ' Short Term Windowing', 'value': 'STW'}
                 ],
-                style={'padding': '20px', 'color': '#FFFFFF', 'background-color': '#171b26'}
+                id='preprocessing-options'
             ),
-        ],
-        id='settings-modal',
-        style={'display': 'none', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': '#171b26', 'border': '2px solid #ddd', 'border-radius': '5px', 'color': '#FFFFFF'}
-    ),
-    html.Div([  # Main content area
-        html.Div([  # Left column container
-            dcc.Loading(  # Add the Loading component
+            dcc.Slider(id='data-sampling-slider', min=0, max=40, value=20, step=1, marks={i: f'{i} min' for i in range(0, 41, 5)}),
+            dcc.Input(id='windowing-input', type='number', value=4.5, step=0.5, min=3.5, max=5.5),
+            dcc.Tabs(
+                id="denoising-tabs",
+                value='none',
+                children=[
+                    dcc.Tab(label='None', value='none'),
+                    dcc.Tab(label='Wavelet-based', value='wavelet'),
+                    dcc.Tab(label='Low-pass', value='low-pass'),
+                    dcc.Tab(label='High-pass', value='high-pass'),
+                    dcc.Tab(label='Band-pass', value='band-pass'),
+                ]
+            ),
+            html.Hr(),
+            html.H4("Feature Extraction"),
+            dcc.Checklist(
+                options=[
+                    {'label': ' Min-Max Normalisation', 'value': 'MMN'},
+                    {'label': ' Include MFCC Derivatives', 'value': 'IMD'}
+                ],
+                id='feature-extraction-options'
+            ),
+            html.Hr(),
+            html.H4("Complexity Reduction"),
+            dcc.Tabs(
+                id="complexity-tabs",
+                value='UMAP',
+                children=[
+                    dcc.Tab(label='UMAP', value='UMAP'),
+                    dcc.Tab(label='t-SNE', value='t-SNE'),
+                    dcc.Tab(label='PCA', value='PCA'),
+                ]
+            ),
+            dcc.Slider(id='n-neighbours-slider', min=0, max=100, value=15, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
+            dcc.Slider(id='min-dist-slider', min=0, max=1, value=0.1, step=0.1, marks={i/10: str(i/10) for i in range(0, 11, 1)}, tooltip={"placement": "bottom", "always_visible": True}),
+            html.Hr(),
+            html.H4("Clustering"),
+            dcc.Dropdown(
+                id='clustering-algorithm-dropdown',
+                options=[
+                    {'label': 'DBScan', 'value': 'DBScan'},
+                    {'label': 'k-means', 'value': 'k-means'},
+                    {'label': 'Agglomerative', 'value': 'Agglomerative'},
+                ],
+                value='DBScan'
+            ),
+            dcc.Slider(id='eps-slider', min=0, max=5, value=0.5, step=0.1, marks={i/10: str(i/10) for i in range(0, 51, 5)}, tooltip={"placement": "bottom", "always_visible": True}),
+            dcc.Slider(id='min-samples-slider', min=0, max=100, value=5, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
+            html.Button('Close', id='close-settings', style={'margin': '20px'}),
+        ], style={'padding': '20px', 'color': 'var(--text-color)', 'background-color': 'var(--background-color)'}),
+    ], id='settings-modal', style={'display': 'none', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)'}),
+    html.Div([
+        html.Div([
+            dcc.Loading(
                 id="loading-upload",
                 children=[
                     dcc.Upload(
@@ -193,8 +204,8 @@ app.layout = html.Div([
                             'borderRadius': '5px',
                             'textAlign': 'center',
                             'margin-bottom': '10px',
+                            'color': 'var(--text-color)'
                         },
-                        # Allow multiple files to be uploaded
                         multiple=True
                     ),
                     html.Div(id='upload-file-info', style={'white-space': 'pre-line'}),
@@ -202,31 +213,30 @@ app.layout = html.Div([
                 type="circle",
             ),
             html.Button('Process Uploaded Data', id='process-data-button'),
-            dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value'], style={'display': 'none'}),
-            html.Div(dcc.Graph(id='scatter-plot', figure=fig),
-                     id='scatterplot-container'),
+            dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
+            html.Div(dcc.Graph(id='scatter-plot', figure=fig, style={'height': '100%', 'width': '100%'}), id='scatterplot-container'),
             html.Div([
-            html.Div(id='checklist-title', children='Classes:'),
+                html.Div(id='checklist-title', children='Classes:'),
+                html.Div([
+                    dcc.Checklist(id='class-labels-checklist',
+                                  options=[{'label': label, 'value': label} for label in label_options],
+                                  value=[],
+                                  labelStyle={'display': 'inline-block', 'margin-right': '10px', 'color': 'var(--text-color)'})
+                ], id='annotation-tags-container')
+            ], id='checklist-container'),
             html.Div([
-                dcc.Checklist(id='class-labels-checklist',
-                              options=[{'label': label, 'value': label} for label in label_options],
-                              value=[],
-                              labelStyle={'display': 'inline-block', 'margin-right': '10px'})
-            ], id='annotation-tags-container')
-        ], id='checklist-container'),
+                html.Button('Save Annotations', id='control-button'),
+                html.A('Download CSV', id='csv-download-link', href='', download='annotations.csv')
+            ]),
+        ], id='left-column'),
         html.Div([
-            html.Button('Save Data File', id='control-button')
-        ]),
-        ], id='left-column'),  # Closing left column
-        html.Div([  # Main window
-            html.Div(id='project-info', children='This is a program designed to improve the audio labelling efficiency of samples derived from the Australian Acoustic Observatory (A2O)'),
             html.Img(id='mel-spectrogram', src=''),
             html.Img(id='waveform-plot', src=''),
         ], id='main-window'),
     ], id='main-horizontal-layout'),
-    html.Div([  # Bottom timeline container
-        html.Div(id='audio-status', children='No audio being played currently.'),
-        html.Div([  # Control buttons
+    html.Div([
+        html.Div(id='audio-status', children='No audio being played currently.', style={'color': 'var(--text-color)'}),
+        html.Div([
             html.Button('◁', id='previous-point'),
             html.Button('||', id='play-audio'),
             html.Button('▷', id='next-point'),
@@ -252,7 +262,7 @@ def toggle_modal(open_clicks, close_clicks, style):
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     if button_id == 'open-settings' and open_clicks:
-        return {'display': 'block', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': '#171b26', 'border': '2px solid #ddd', 'border-radius': '5px', 'color': '#FFFFFF'}
+        return {'display': 'block', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)'}
 
     elif button_id == 'close-settings' and close_clicks:
         return {'display': 'none'}
@@ -282,36 +292,50 @@ def update_checklist(play_clicks, next_clicks, prev_clicks, samples_json):
     return checked_boxes
 
 @app.callback(
-    Output('csv-dummy-output', 'children'),  # Create a new dummy output to save CSV
-    [Input('control-button', 'n_clicks'),
-     Input('class-labels-checklist', 'value')],
-    [State('hidden-sample-data', 'children')])
-def save_to_csv(n_clicks, checklist_values, samples_json):
-    ctx = dash.callback_context
-    if not ctx.triggered:
+    Output('csv-dummy-output', 'children'),
+    [Input('control-button', 'n_clicks')],
+    [State('class-labels-checklist', 'value'),
+     State('hidden-sample-data', 'children')]
+)
+def update_annotations(n_clicks, selected_labels, samples_json):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    if samples_json is None:
         return dash.no_update
-    else:
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    samples = json.loads(samples_json)
+    current_sample = samples["data"][samples["current_index"]]
+    sound_path = current_sample['sound_path']
 
-    if button_id == 'control-button':
-        # Save the DataFrame to the same CSV file
-        df.to_csv(current_csv_file, index=False)
-    else:
-        # Update the DataFrame based on which checkboxes are checked
-        if samples_json:
-            samples = json.loads(samples_json)
-            current_sample = samples["data"][samples["current_index"]]
-            sound_file = current_sample['sound_path']
+    row_index = annotations_df.index[annotations_df['sound_path'] == sound_path].tolist()
+    if not row_index:
+        row_index = len(annotations_df)
+        annotations_df.loc[row_index] = [current_sample['x'], current_sample['y'], current_sample['z'], sound_path] + [0] * len(label_options)
 
-            # Reset all label columns to 0 for the current sound file
-            for col in label_options:
-                df.loc[df['sound_path'] == sound_file, col.lower().replace(' ', '_')] = 0
-            
-            # Set selected label columns to 1 for the current sound file
-            for value in checklist_values:
-                df.loc[df['sound_path'] == sound_file, value] = 1
+    for label in label_options:
+        column_name = label.lower().replace(' ', '_')
+        annotations_df.loc[row_index, column_name] = 1 if label in selected_labels else 0
 
-    return dash.no_update  #TODO: Display some text here to confirm save
+    return dash.no_update
+
+@app.callback(
+    Output('csv-download-link', 'href'),
+    Input('control-button', 'n_clicks'),
+    prevent_initial_call=True
+)
+def save_and_download_csv(n_clicks):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    filepath = 'annotations.csv'
+    save_annotations_to_csv(annotations_df, filepath)
+    return f'/download/{filepath}'
+
+@app.server.route('/download/<path:filename>')
+def serve_file(filename):
+    file_path = os.path.join(os.getcwd(), filename)
+    return send_from_directory(os.getcwd(), filename, as_attachment=True)
 
 @app.callback(
     [Output('scatter-plot', 'figure'),
@@ -347,18 +371,20 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
         # Read the new CSV file
         new_df = pd.read_csv(csv_path)
 
-        # Create a new figure based on the new data
-        new_fig = go.Figure()
-        new_fig.update_layout(paper_bgcolor="#171b26")
-        colors = cycle(plotly.colors.sequential.Rainbow)
-        for c in new_df['class'].unique():
-            dfi = new_df[new_df['class'] == c]
-            new_fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
-                                           mode='markers',
-                                           name=str(c),
-                                           customdata=dfi['sound_path'],
-                                           marker=dict(size=2),
-                                           marker_color=next(colors)))
+        # # Create a new figure based on the new data
+        # new_fig = go.Figure()
+        # new_fig.update_layout(paper_bgcolor="#171b26")
+        # colors = cycle(plotly.colors.sequential.Rainbow)
+        # for c in new_df['class'].unique():
+        #     dfi = new_df[new_df['class'] == c]
+        #     new_fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
+        #                                    mode='markers',
+        #                                    name=str(c),
+        #                                    customdata=dfi['sound_path'],
+        #                                    marker=dict(size=2),
+        #                                    marker_color=next(colors)))
+
+        new_fig = create_figure(new_df)
 
         # Update the sample data state
         new_samples_json = json.dumps({"data": new_df.to_dict('records'), "current_index": 0})
@@ -392,10 +418,19 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
             sampled_point_index = 9
 
     elif button_id == 'play-audio':
-        current_sample = samples["data"][samples["current_index"]]
-        play_sound(current_sample['sound_path'])
-        current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
-        status = f"Playing sample {samples['current_index'] + 1} from cluster: {current_class}"
+        if pygame.mixer.music.get_busy():
+            pause_sound()
+            status = "Audio paused."
+        else:
+            if samples_json is None:
+                return dash.no_update, "No audio to play.", dash.no_update
+
+            samples = json.loads(samples_json)
+            current_sample = samples["data"][samples["current_index"]]
+            play_sound(current_sample['sound_path'])
+            current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
+            status = f"Playing sample {samples['current_index'] + 1} from cluster: {current_class}"
+        return dash.no_update, status, samples_json
 
     elif button_id == 'file-dropdown':
         new_fig = update_figure(selected_file)
@@ -457,7 +492,7 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
         if trace.name == str(current_class):
             trace.marker.size = 10
         else:
-            trace.marker.size = 2
+            trace.marker.size = 5
 
     return fig, status, samples_json
 
@@ -501,6 +536,8 @@ def update_plots(play_clicks, next_clicks, samples_json):
     plt.savefig(buf, format='png')
     buf.seek(0)
     waveform_base64 = base64.b64encode(buf.read()).decode()
+
+    matplotlib.pyplot.close()
 
     # Return the base64 encoded images as the src of the HTML image tags
     return f'data:image/png;base64,{mel_spectrogram_base64}', f'data:image/png;base64,{waveform_base64}'
@@ -593,15 +630,15 @@ def process_all_uploaded_files(n_clicks, stored_files):
     uploaded_files.clear()
     return results_csv_path
 
-# Flask route for serving the results CSV file
-@app.server.route('/download/<path:filename>')
-def serve_file(filename):
-    # Ensure the file exists
-    file_path = os.path.join(TEMP_FOLDER, filename)
-    if not os.path.exists(file_path):
-        return f"File not found: {filename}", 404  # Return a 404 if the file doesn't exist
+# # Flask route for serving the results CSV file
+# @app.server.route('/download/<path:filename>')
+# def serve_file(filename):
+#     # Ensure the file exists
+#     file_path = os.path.join(TEMP_FOLDER, filename)
+#     if not os.path.exists(file_path):
+#         return f"File not found: {filename}", 404  # Return a 404 if the file doesn't exist
 
-    return send_from_directory(TEMP_FOLDER, filename, as_attachment=True)
+#     return send_from_directory(TEMP_FOLDER, filename, as_attachment=True)
 
 @app.callback(
     Output('upload-file-info', 'children'),
@@ -644,18 +681,20 @@ def update_figure(selected_file):
     current_cluster_index = 0
     sampled_point_index = 0
 
-    # Create a new figure based on the new data
-    fig = go.Figure()
-    fig.update_layout(paper_bgcolor="#171b26")
-    colors = cycle(plotly.colors.sequential.Rainbow)
-    for c in df['class'].unique():
-        dfi = df[df['class'] == c]
-        fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
-                                   mode='markers',
-                                   name=str(c),
-                                   customdata=dfi['sound_path'],
-                                   marker=dict(size=2),
-                                   marker_color=next(colors)))
+    # # Create a new figure based on the new data
+    # fig = go.Figure()
+    # fig.update_layout(paper_bgcolor="#171b26")
+    # colors = cycle(plotly.colors.sequential.Rainbow)
+    # for c in df['class'].unique():
+    #     dfi = df[df['class'] == c]
+    #     fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
+    #                                mode='markers',
+    #                                name=str(c),
+    #                                customdata=dfi['sound_path'],
+    #                                marker=dict(size=2),
+    #                                marker_color=next(colors)))
+
+    fig = create_figure(df)
 
     return fig
 
