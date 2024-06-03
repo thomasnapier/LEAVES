@@ -84,7 +84,7 @@ def create_figure(df):
         dfi = df[df['class'] == c]
         fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
                                 mode='markers',
-                                name="Class " + str(c),
+                                name="Cluster " + str(c),
                                 customdata=dfi['sound_path'],
                                 marker=dict(size=5, line=dict(width=0.1, color='black')),
                                 marker_color=[f'rgba{colors(i)}' for _ in range(len(dfi))]))
@@ -112,6 +112,7 @@ def create_figure(df):
 # Define app and layout
 fig = create_figure(df)
 app = dash.Dash(__name__, external_stylesheets=["assets/css/styles.css"])
+server = app.server
 
 # Load the logo image
 logo_path = 'assets/logos/logo.png'
