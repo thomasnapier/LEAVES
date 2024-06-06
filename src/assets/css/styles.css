@@ -7,7 +7,7 @@ html {
 }
 
 body {
-    font-size: 1em;
+    font-size: 1.2em;
     line-height: 1.6;
     font-weight: 400;
     font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -173,11 +173,13 @@ button:focus {
 .modal-content {
     background-color: var(--modal-background-color);
     color: var(--modal-text-color);
-    margin: 15% auto;
+    margin: 5% auto;
     padding: 20px;
     border: 1px solid #888;
-    width: 80%;
-    max-width: 500px;
+    width: 60%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
     border-radius: 5px;
 }
 
@@ -258,4 +260,126 @@ button:focus {
     --grid-color: #444444;
     --marker-line-color: #ffffff;
     --marker-color: tab10;
+}
+
+/* Custom styles for settings modal */
+#settings-modal .section {
+    margin-bottom: 20px;
+}
+
+#settings-modal .option-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    justify-content: space-between;
+}
+
+#settings-modal .option-label {
+    flex: 1;
+    color: var(--text-color);
+    font-size: 1.2em;
+    text-align: left;
+}
+
+#settings-modal .option-component {
+    flex: 2;
+    margin-left: 20px;
+    text-align: right;
+}
+
+#settings-modal .option-component input,
+#settings-modal .option-component dcc-slider,
+#settings-modal .option-component dcc-dropdown,
+#settings-modal .option-component .dash-slider,
+#settings-modal .option-component .dash-dropdown {
+    width: 50%;
+    height: 2em;
+}
+
+/* Toggle Switch Styles */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #2196F3;
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+#settings-modal .toggle-button {
+    font-size: 1em;
+    padding: 5px 10px;
+    margin: 2px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+#settings-modal .toggle-button.active {
+    background-color: var(--button-hover-background-color);
+    color: #fff;
+}
+
+/* Styles for making radio buttons look like buttons */
+.dash-radioitems-container .dash-radioitems-item input[type="radio"] {
+    display: none;
+}
+
+.dash-radioitems-container .dash-radioitems-item label {
+    display: inline-block;
+    padding: 10px 20px;
+    margin-right: 10px;
+    border-radius: 5px;
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.dash-radioitems-container .dash-radioitems-item input[type="radio"]:checked + label {
+    background-color: var(--button-hover-background-color);
+    color: #fff;
+}
+
+#settings-modal .section-header {
+    font-size: 1.5em;
+    margin-bottom: 20px;
 }

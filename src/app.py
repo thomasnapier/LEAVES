@@ -8,12 +8,15 @@ samples derived from the Australian Acoustic Observatory (A2O)
 """
 
 #Imports
+from re import T
+from tkinter.tix import Tree
 import pandas as pd
 from py import process
 import plotly.graph_objs as go
 import dash
 from dash import dcc, html, State
 from dash.dependencies import Input, Output
+import dash_bootstrap_components as dbc
 from dash import no_update
 import plotly
 import pygame
@@ -111,12 +114,29 @@ def create_figure(df):
 
 # Define app and layout
 fig = create_figure(df)
-app = dash.Dash(__name__, external_stylesheets=["assets/css/styles.css"])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 
 # Load the logo image
 logo_path = 'assets/logos/logo.png'
 encoded_logo = base64.b64encode(open(logo_path, 'rb').read()).decode('ascii')
+
+# Set default values
+default_values = {
+    'preprocessing-sds': True,
+    'preprocessing-stw': True,
+    'data-sampling': 20,
+    'windowing': 4.5,
+    'denoising-method': 'none',
+    'feature-extraction-mmn': True,
+    'feature-extraction-imd': False,
+    'complexity-reduction': 'UMAP',
+    'n-neighbours': 15,
+    'min-dist': 0.1,
+    'clustering-algorithm': 'DBScan',
+    'eps': 0.5,
+    'min-samples': 5
+}
 
 app.layout = html.Div([
     html.Div([
@@ -124,70 +144,131 @@ app.layout = html.Div([
         html.Span('LEAVES', id='top-banner-title')
     ], id='top-banner'),
     html.Button('⚙️', id='open-settings', style={'position': 'absolute', 'top': '10px', 'right': '10px'}),
-    html.Button('🌙/☀️', id='theme-toggle', style={'position': 'absolute', 'top': '10px', 'right': '100px'}),
+    html.Button('🌙/☀️', id='theme-toggle', style={'position': 'absolute', 'top': '10px', 'right': '150px'}),
     html.Div([
         html.Div([
             html.H2("Software Configuration", style={'textAlign': 'center', 'color': 'var(--text-color)'}),
             html.Hr(style={'background-color': 'var(--text-color)'}),
-            html.H4("Preprocessing"),
-            dcc.Checklist(
-                options=[
-                    {'label': ' Systematic Data Sampling', 'value': 'SDS'},
-                    {'label': ' Short Term Windowing', 'value': 'STW'}
-                ],
-                id='preprocessing-options'
-            ),
-            dcc.Slider(id='data-sampling-slider', min=0, max=40, value=20, step=1, marks={i: f'{i} min' for i in range(0, 41, 5)}),
-            dcc.Input(id='windowing-input', type='number', value=4.5, step=0.5, min=3.5, max=5.5),
-            dcc.Tabs(
-                id="denoising-tabs",
-                value='none',
-                children=[
-                    dcc.Tab(label='None', value='none'),
-                    dcc.Tab(label='Wavelet-based', value='wavelet'),
-                    dcc.Tab(label='Low-pass', value='low-pass'),
-                    dcc.Tab(label='High-pass', value='high-pass'),
-                    dcc.Tab(label='Band-pass', value='band-pass'),
-                ]
-            ),
+            html.Div([
+                html.H4("Preprocessing", className='section-header'),
+                html.Div([
+                    html.Label('Systematic Data Sampling', className='option-label'),
+                    dcc.Checklist(
+                        options=[{'label': '', 'value': 'preprocessing-sds'}],
+                        value=['preprocessing-sds'] if default_values['preprocessing-sds'] else [],
+                        id='preprocessing-sds',
+                        className='toggle-switch'
+                    )
+                ], className='option-row'),
+                html.Div([
+                    html.Label('Short Term Windowing', className='option-label'),
+                    dcc.Checklist(
+                        options=[{'label': '', 'value': 'preprocessing-stw'}],
+                        value=['preprocessing-stw'] if default_values['preprocessing-stw'] else [],
+                        id='preprocessing-stw',
+                        className='toggle-switch'
+                    )
+                ], className='option-row'),
+                html.Div([
+                    html.Label('Windowing Input (sec)', className='option-label', style={'marginLeft': '40px'}),
+                    dcc.Slider(id='windowing-slider', min=1, max=10, step=0.5, value=default_values['windowing'], marks={i: str(i) for i in range(1, 11)}, className='option-component'),
+                    dcc.Input(id='windowing-input', type='number', value=default_values['windowing'], step=0.5, min=1, max=10, className='option-component', style={'width': '50px'})
+                ], className='option-row', style={'marginLeft': '20px'}),
+                html.Div([
+                    html.Label('Data Sampling (min)', className='option-label'),
+                    dcc.Slider(id='data-sampling-slider', min=0, max=40, value=default_values['data-sampling'], step=1, marks={i: f'{i} min' for i in range(0, 41, 5)}, className='option-component'),
+                    dcc.Input(id='data-sampling-input', type='number', value=default_values['data-sampling'], step=1, min=0, max=40, className='option-component', style={'width': '50px'})
+                ], className='option-row'),
+                html.Div([
+                    html.Label('Denoising Method', className='option-label'),
+                    dbc.ButtonGroup(
+                        [
+                            dbc.Button('None', id='denoising-none', color='secondary', className='toggle-button', active=default_values['denoising-method'] == 'none'),
+                            dbc.Button('Wavelet-based', id='denoising-wavelet', color='secondary', className='toggle-button', active=default_values['denoising-method'] == 'wavelet'),
+                            dbc.Button('Low-pass', id='denoising-lowpass', color='secondary', className='toggle-button', active=default_values['denoising-method'] == 'low-pass'),
+                            dbc.Button('High-pass', id='denoising-highpass', color='secondary', className='toggle-button', active=default_values['denoising-method'] == 'high-pass'),
+                            dbc.Button('Band-pass', id='denoising-bandpass', color='secondary', className='toggle-button', active=default_values['denoising-method'] == 'band-pass')
+                        ], className='option-component', id='denoising-method'
+                    )
+                ], className='option-row'),
+            ], className='section'),
+
             html.Hr(),
-            html.H4("Feature Extraction"),
-            dcc.Checklist(
-                options=[
-                    {'label': ' Min-Max Normalisation', 'value': 'MMN'},
-                    {'label': ' Include MFCC Derivatives', 'value': 'IMD'}
-                ],
-                id='feature-extraction-options'
-            ),
+            html.Div([
+                html.H4("Feature Extraction", className='section-header'),
+                html.Div([
+                    html.Label('Min-Max Normalisation', className='option-label'),
+                    dcc.Checklist(
+                        options=[{'label': '', 'value': 'feature-extraction-mmn'}],
+                        value=['feature-extraction-mmn'] if default_values['feature-extraction-mmn'] else [],
+                        id='feature-extraction-mmn',
+                        className='toggle-switch'
+                    )
+                ], className='option-row'),
+                html.Div([
+                    html.Label('Include MFCC Derivatives', className='option-label'),
+                    dcc.Checklist(
+                        options=[{'label': '', 'value': 'feature-extraction-imd'}],
+                        value=['feature-extraction-imd'] if default_values['feature-extraction-imd'] else [],
+                        id='feature-extraction-imd',
+                        className='toggle-switch'
+                    )
+                ], className='option-row'),
+            ], className='section'),
+
             html.Hr(),
-            html.H4("Complexity Reduction"),
-            dcc.Tabs(
-                id="complexity-tabs",
-                value='UMAP',
-                children=[
-                    dcc.Tab(label='UMAP', value='UMAP'),
-                    dcc.Tab(label='t-SNE', value='t-SNE'),
-                    dcc.Tab(label='PCA', value='PCA'),
-                ]
-            ),
-            dcc.Slider(id='n-neighbours-slider', min=0, max=100, value=15, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
-            dcc.Slider(id='min-dist-slider', min=0, max=1, value=0.1, step=0.1, marks={i/10: str(i/10) for i in range(0, 11, 1)}, tooltip={"placement": "bottom", "always_visible": True}),
+            html.Div([
+                html.H4("Complexity Reduction", className='section-header'),
+                html.Div([
+                    html.Label('Reduction Method', className='option-label'),
+                    dbc.ButtonGroup(
+                        [
+                            dbc.Button('UMAP', id='complexity-umap', color='secondary', className='toggle-button', active=default_values['complexity-reduction'] == 'UMAP'),
+                            dbc.Button('t-SNE', id='complexity-tsne', color='secondary', className='toggle-button', active=default_values['complexity-reduction'] == 't-SNE'),
+                            dbc.Button('PCA', id='complexity-pca', color='secondary', className='toggle-button', active=default_values['complexity-reduction'] == 'PCA')
+                        ], className='option-component', id='complexity-reduction'
+                    )
+                ], className='option-row'),
+                html.Div([
+                    html.Label('N Neighbours', className='option-label'),
+                    dcc.Slider(id='n-neighbours-slider', min=0, max=100, value=default_values['n-neighbours'], step=1, marks={i: str(i) for i in range(0, 101, 10)}, className='option-component'),
+                    dcc.Input(id='n-neighbours-input', type='number', value=default_values['n-neighbours'], step=1, min=0, max=100, className='option-component', style={'width': '50px'})
+                ], className='option-row'),
+                html.Div([
+                    html.Label('Min Distance', className='option-label'),
+                    dcc.Slider(id='min-dist-slider', min=0, max=1, value=default_values['min-dist'], step=0.1, marks={i/10: str(i/10) for i in range(0, 11, 1)}, className='option-component'),
+                    dcc.Input(id='min-dist-input', type='number', value=default_values['min-dist'], step=0.1, min=0, max=1, className='option-component', style={'width': '50px'})
+                ], className='option-row'),
+            ], className='section'),
+
             html.Hr(),
-            html.H4("Clustering"),
-            dcc.Dropdown(
-                id='clustering-algorithm-dropdown',
-                options=[
-                    {'label': 'DBScan', 'value': 'DBScan'},
-                    {'label': 'k-means', 'value': 'k-means'},
-                    {'label': 'Agglomerative', 'value': 'Agglomerative'},
-                ],
-                value='DBScan'
-            ),
-            dcc.Slider(id='eps-slider', min=0, max=5, value=0.5, step=0.1, marks={i/10: str(i/10) for i in range(0, 51, 5)}, tooltip={"placement": "bottom", "always_visible": True}),
-            dcc.Slider(id='min-samples-slider', min=0, max=100, value=5, step=1, marks={i: str(i) for i in range(0, 101, 10)}, tooltip={"placement": "bottom", "always_visible": True}),
-            html.Button('Close', id='close-settings', style={'margin': '20px'}),
-        ], style={'padding': '20px', 'color': 'var(--text-color)', 'background-color': 'var(--background-color)'}),
-    ], id='settings-modal', style={'display': 'none', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)'}),
+            html.Div([
+                html.H4("Clustering", className='section-header'),
+                html.Div([
+                    html.Label('Clustering Algorithm', className='option-label'),
+                    dbc.ButtonGroup(
+                        [
+                            dbc.Button('DBScan', id='clustering-dbscan', color='secondary', className='toggle-button', active=default_values['clustering-algorithm'] == 'DBScan'),
+                            dbc.Button('k-means', id='clustering-kmeans', color='secondary', className='toggle-button', active=default_values['clustering-algorithm'] == 'k-means'),
+                            dbc.Button('Agglomerative', id='clustering-agglomerative', color='secondary', className='toggle-button', active=default_values['clustering-algorithm'] == 'Agglomerative')
+                        ], className='option-component', id='clustering-algorithm'
+                    )
+                ], className='option-row'),
+                html.Div([
+                    html.Label('Eps', className='option-label'),
+                    dcc.Slider(id='eps-slider', min=0, max=5, value=default_values['eps'], step=0.1, marks={i/10: str(i/10) for i in range(0, 51, 5)}, className='option-component'),
+                    dcc.Input(id='eps-input', type='number', value=default_values['eps'], step=0.1, min=0, max=5, className='option-component', style={'width': '50px'})
+                ], className='option-row'),
+                html.Div([
+                    html.Label('Min Samples', className='option-label'),
+                    dcc.Slider(id='min-samples-slider', min=0, max=100, value=default_values['min-samples'], step=1, marks={i: str(i) for i in range(0, 101, 10)}, className='option-component'),
+                    dcc.Input(id='min-samples-input', type='number', value=default_values['min-samples'], step=1, min=0, max=100, className='option-component', style={'width': '50px'})
+                ], className='option-row'),
+            ], className='section'),
+
+            html.Button('Done', id='close-settings', style={'margin': '20px'}),
+        ], style={'padding': '20px', 'color': 'var(--text-color)', 'background-color': 'var(--background-color)', 'max-height': '80vh', 'overflow-y': 'auto'}),
+    ], id='settings-modal', style={'display': 'none', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '5%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)', 'max-height': '80vh', 'overflow-y': 'auto'}),
     html.Div([
         html.Div([
             dcc.Loading(
@@ -222,7 +303,8 @@ app.layout = html.Div([
                     dcc.Checklist(id='class-labels-checklist',
                                   options=[{'label': label, 'value': label} for label in label_options],
                                   value=[],
-                                  labelStyle={'display': 'inline-block', 'margin-right': '10px', 'color': 'var(--text-color)'})
+                                  labelStyle={'display': 'inline-block', 'margin-right': '10px', 'color': 'var(--text-color)'}
+                    )
                 ], id='annotation-tags-container')
             ], id='checklist-container'),
             html.Div([
@@ -238,9 +320,11 @@ app.layout = html.Div([
     html.Div([
         html.Div(id='audio-status', children='No audio being played currently.', style={'color': 'var(--text-color)'}),
         html.Div([
+            html.Button('|◁◁', id='previous-cluster'),  # New button for previous cluster
             html.Button('◁', id='previous-point'),
             html.Button('||', id='play-audio'),
             html.Button('▷', id='next-point'),
+            html.Button('▷▷|', id='next-cluster'),  # New button for next cluster
         ], id='button-group'),
     ], id='bottom-timeline'),
     html.Div(id='hidden-sample-data'),
@@ -249,6 +333,8 @@ app.layout = html.Div([
     html.Div(id='temporary-storage', style={'display': 'none'})
 ], id='main-container')
 
+
+# Callbacks
 @app.callback(
     Output('settings-modal', 'style'),
     [Input('open-settings', 'n_clicks'), Input('close-settings', 'n_clicks')],
@@ -263,14 +349,117 @@ def toggle_modal(open_clicks, close_clicks, style):
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     if button_id == 'open-settings' and open_clicks:
-        return {'display': 'block', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)'}
+        return {'display': 'block', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)', 'max-height': '80vh'}
 
     elif button_id == 'close-settings' and close_clicks:
         return {'display': 'none'}
 
     return style
 
-# Callbacks
+# Callback for toggling active button in button group
+@app.callback(
+    [Output('denoising-none', 'active'),
+     Output('denoising-wavelet', 'active'),
+     Output('denoising-lowpass', 'active'),
+     Output('denoising-highpass', 'active'),
+     Output('denoising-bandpass', 'active')],
+    [Input('denoising-none', 'n_clicks'),
+     Input('denoising-wavelet', 'n_clicks'),
+     Input('denoising-lowpass', 'n_clicks'),
+     Input('denoising-highpass', 'n_clicks'),
+     Input('denoising-bandpass', 'n_clicks')]
+)
+def toggle_denoising_method(n_none, n_wavelet, n_lowpass, n_highpass, n_bandpass):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    return [
+        button_id == 'denoising-none',
+        button_id == 'denoising-wavelet',
+        button_id == 'denoising-lowpass',
+        button_id == 'denoising-highpass',
+        button_id == 'denoising-bandpass'
+    ]
+
+# Callback for toggling active button in complexity reduction
+@app.callback(
+    [Output('complexity-umap', 'active'),
+     Output('complexity-tsne', 'active'),
+     Output('complexity-pca', 'active')],
+    [Input('complexity-umap', 'n_clicks'),
+     Input('complexity-tsne', 'n_clicks'),
+     Input('complexity-pca', 'n_clicks')]
+)
+def toggle_complexity_method(n_umap, n_tsne, n_pca):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    return [
+        button_id == 'complexity-umap',
+        button_id == 'complexity-tsne',
+        button_id == 'complexity-pca'
+    ]
+
+# Callback for toggling active button in clustering algorithm
+@app.callback(
+    [Output('clustering-dbscan', 'active'),
+     Output('clustering-kmeans', 'active'),
+     Output('clustering-agglomerative', 'active')],
+    [Input('clustering-dbscan', 'n_clicks'),
+     Input('clustering-kmeans', 'n_clicks'),
+     Input('clustering-agglomerative', 'n_clicks')]
+)
+def toggle_clustering_algorithm(n_dbscan, n_kmeans, n_agglomerative):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    return [
+        button_id == 'clustering-dbscan',
+        button_id == 'clustering-kmeans',
+        button_id == 'clustering-agglomerative'
+    ]
+
+# Callback for synchronizing sliders and input values
+@app.callback(
+    [Output('data-sampling-slider', 'value'),
+     Output('data-sampling-input', 'value')],
+    [Input('data-sampling-slider', 'value'),
+     Input('data-sampling-input', 'value')]
+)
+def sync_slider_input(slider_value, input_value):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    input_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    if input_id == 'data-sampling-slider':
+        return slider_value, slider_value
+    elif input_id == 'data-sampling-input':
+        return input_value, input_value
+
+# Callback for toggle switches
+@app.callback(
+    [Output('preprocessing-sds', 'value'),
+     Output('preprocessing-stw', 'value'),
+     Output('feature-extraction-mmn', 'value'),
+     Output('feature-extraction-imd', 'value')],
+    [Input('preprocessing-sds', 'value'),
+     Input('preprocessing-stw', 'value'),
+     Input('feature-extraction-mmn', 'value'),
+     Input('feature-extraction-imd', 'value')]
+)
+def sync_toggles(sds, stw, mmn, imd):
+    return sds, stw, mmn, imd
+
 @app.callback(
     Output('class-labels-checklist', 'value'),
     [Input('play-audio', 'n_clicks'),
@@ -345,14 +534,15 @@ def serve_file(filename):
     [Input('play-audio', 'n_clicks'),
      Input('next-point', 'n_clicks'),
      Input('previous-point', 'n_clicks'),
+     Input('next-cluster', 'n_clicks'),  # New input
+     Input('previous-cluster', 'n_clicks'),  # New input
      Input('file-dropdown', 'value'),
      Input('scatter-plot', 'clickData'),
      Input('class-labels-checklist', 'value'),
      Input('csv-test', 'children')],
     State('hidden-sample-data', 'children'))
-def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickData, selected_labels, csv_path, samples_json):
+def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, prev_cluster_clicks, selected_file, clickData, selected_labels, csv_path, samples_json):
     global current_cluster_index, sampled_point_index, current_csv_file
-    # Trigger context
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update, dash.no_update, dash.no_update
@@ -364,8 +554,22 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
         current_class = df['class'].unique()[current_cluster_index]
         sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         samples_json = json.dumps({"data": sampled_points, "current_index": 0})
-    
+
     samples = json.loads(samples_json)
+
+    if button_id in ['next-cluster', 'previous-cluster']:
+        if button_id == 'next-cluster':
+            current_cluster_index += 1
+        elif button_id == 'previous-cluster':
+            current_cluster_index -= 1
+        
+        if current_cluster_index >= len(df['class'].unique()):
+            current_cluster_index = 0  # Reset to the first cluster
+        current_class = df['class'].unique()[current_cluster_index]
+        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
+        samples_json = json.dumps({"data": sampled_points, "current_index": 0})
+        samples = json.loads(samples_json)
+        sampled_point_index = 0
 
 
     if button_id == 'csv-test' and csv_path:
@@ -442,7 +646,7 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
         new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
         return new_fig, "File changed. Playing from the first point in the new cluster.", new_samples_json
     
-    elif button_id == 'control-button':  # Assuming this is the ID for your save button
+    elif button_id == 'control-button': 
         df.to_csv(current_csv_file, index=False)
 
     elif button_id == 'class-labels-checklist':
@@ -500,9 +704,12 @@ def process_audio(play_clicks, next_clicks, prev_clicks, selected_file, clickDat
 @app.callback([Output('mel-spectrogram', 'src'),
                Output('waveform-plot', 'src')],
               [Input('play-audio', 'n_clicks'),
-               Input('next-point', 'n_clicks')],
+               Input('next-point', 'n_clicks'),
+               Input('previous-point', 'n_clicks'),
+               Input('previous-cluster', 'n_clicks'),
+               Input('next-cluster', 'n_clicks')],
               [State('hidden-sample-data', 'children')])
-def update_plots(play_clicks, next_clicks, samples_json):
+def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_clicks, next_cluster_clicks, samples_json):
     # Clear previous figure
     plt.clf()
     matplotlib.pyplot.close()
