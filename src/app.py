@@ -46,6 +46,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.cluster import DBSCAN
 import numpy as np
 import tempfile
+import dash_uploader as du
 
 
 # Initialise pygame mixer
@@ -121,6 +122,10 @@ server = app.server
 # Load the logo image
 logo_path = 'assets/logos/logo.png'
 encoded_logo = base64.b64encode(open(logo_path, 'rb').read()).decode('ascii')
+
+# Initialize dash-uploader
+UPLOAD_FOLDER_ROOT = "uploads"
+du.configure_upload(app, UPLOAD_FOLDER_ROOT)
 
 # Set default values
 default_values = {
@@ -272,29 +277,17 @@ app.layout = html.Div([
     ], id='settings-modal', style={'display': 'none', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '5%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)', 'max-height': '80vh', 'overflow-y': 'auto'}),
     html.Div([
         html.Div([
-            dcc.Loading(
-                id="loading-upload",
-                children=[
-                    dcc.Upload(
-                        id='upload-audio',
-                        children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-                        style={
-                            'width': '100%',
-                            'height': '60px',
-                            'lineHeight': '60px',
-                            'borderWidth': '1px',
-                            'borderStyle': 'dashed',
-                            'borderRadius': '5px',
-                            'textAlign': 'center',
-                            'margin-bottom': '10px',
-                            'color': 'var(--text-color)'
-                        },
-                        multiple=True
-                    ),
-                    html.Div(id='upload-file-info', style={'white-space': 'pre-line'}),
-                ],
-                type="circle",
-            ),
+            # Dash-Uploader component
+            du.Upload(
+            id='uploader',
+            text='Drag and Drop or Select Files',
+            text_completed='Upload Complete: ',
+            pause_button=True,
+            cancel_button=True,
+            max_file_size=1800,  # 1.8 GB
+            max_files = 100
+        ),
+        html.Div(id='upload-status', style={'color': 'var(--text-color)'}),
             html.Button('Process Uploaded Data', id='process-data-button'),
             dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
             html.Div(dcc.Graph(id='scatter-plot', figure=fig, style={'height': '100%', 'width': '100%'}), id='scatterplot-container'),
@@ -759,23 +752,46 @@ def store_uploaded_files(contents, filenames, stored_files):
     return stored_files
 
 @app.callback(
+    Output('upload-status', 'children'),
+    [Input('uploader', 'isCompleted')],
+    [State('uploader', 'fileNames'),
+     State('uploader', 'upload_id')]
+)
+def handle_file_upload(isCompleted, filenames, upload_id):
+    if not isCompleted:
+        return "No files uploaded."
+
+    if filenames is None or len(filenames) == 0:
+        return "No files uploaded."
+
+    # The folder path where files are uploaded
+    folder_path = os.path.join(UPLOAD_FOLDER_ROOT, upload_id)
+
+    # Save full file paths in a temporary storage for later processing
+    for filename in filenames:
+        file_path = os.path.join(folder_path, filename)
+        uploaded_files.append(file_path)
+    
+    # Store the paths in a hidden div or another suitable storage element
+    return json.dumps(uploaded_files)
+
+
+@app.callback(
     Output('csv-test', 'children'),
     Input('process-data-button', 'n_clicks'),
-    State('temporary-storage', 'children'),
+    State('upload-status', 'children'),
     prevent_initial_call=True
 )
-def process_all_uploaded_files(n_clicks, stored_files):
-    if n_clicks is None or stored_files is None:
+def process_uploaded_files(n_clicks, stored_file_paths_json):
+    if n_clicks is None or stored_file_paths_json is None:
         raise PreventUpdate
 
-    # Read file paths from the temporary file
-    with open(stored_files, 'r') as file:
-        file_paths = file.read().splitlines()
+    stored_file_paths = json.loads(stored_file_paths_json)
 
     combined_feature_vectors = []
     combined_sound_paths = []
 
-    for file_path in file_paths:
+    for file_path in stored_file_paths:
         audio = AudioSegment.from_file(file_path, format=file_path.rsplit('.', 1)[1].lower())
         feature_vectors, sound_paths = process_audio_chunk(audio, os.path.dirname(file_path), file_path.rsplit('.', 1)[1].lower(), os.path.splitext(file_path)[0], duration=20)
         
@@ -810,12 +826,16 @@ def process_all_uploaded_files(n_clicks, stored_files):
 
     # Save the results to a CSV file
     results_csv_filename = 'combined_umap_dbscan.csv'
-    results_csv_path = os.path.join(TEMP_FOLDER, results_csv_filename)
+    results_csv_path = os.path.join(UPLOAD_FOLDER_ROOT, results_csv_filename)
     results_df.to_csv(results_csv_path, index=False)
 
-    # Clear the global list after processing
-    uploaded_files.clear()
+    # Clear the stored file paths after processing
+    stored_file_paths.clear()
+
     return results_csv_path
+
+
+
 
 # # Flask route for serving the results CSV file
 # @app.server.route('/download/<path:filename>')
@@ -915,7 +935,8 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
         chunk_data = audio[start_time:end_time]
 
         chunk_file_name = f'{original_filename}_{chunk_index}.{file_format}'
-        chunk_file_path = os.path.join(output_folder, chunk_file_name)
+        chunk_file_path = chunk_file_name
+        
 
         chunk_data.export(chunk_file_path, format=file_format)
         total_time_ms += chunk_length_ms
@@ -937,7 +958,7 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
     # Save feature vectors to CSV
     paths = pd.DataFrame(sound_paths)
     df = pd.concat([feature_vectors, paths], ignore_index=True, sort=False, axis=1)
-    features_csv_path = os.path.join(output_folder, f'{original_filename}_features.csv')
+    features_csv_path =  f'{original_filename}_features.csv'
     df.to_csv(features_csv_path, index=False)
 
     return feature_vectors, sound_paths
