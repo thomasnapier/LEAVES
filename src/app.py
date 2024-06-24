@@ -78,18 +78,18 @@ annotations_df = pd.DataFrame(columns=columns)
 def save_annotations_to_csv(df, filepath):
     df.to_csv(filepath, index=False)
 
-def create_figure(df):
-    # Initialize colors and figure
+def create_figure(df, current_cluster_index):
     classes = df['class'].unique()
     colors = plt.cm.get_cmap('tab10', len(classes))
     fig = go.Figure()
     for i, c in enumerate(classes):
         dfi = df[df['class'] == c]
+        marker_size = 10 if i == current_cluster_index else 5  # Highlight current cluster
         fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
                                 mode='markers',
                                 name="Cluster " + str(c),
                                 customdata=dfi['sound_path'],
-                                marker=dict(size=5, line=dict(width=0.1, color='black')),
+                                marker=dict(size=marker_size, line=dict(width=0.1, color='black')),
                                 marker_color=[f'rgba{colors(i)}' for _ in range(len(dfi))]))
         
     fig.update_layout(
@@ -112,8 +112,9 @@ def create_figure(df):
     
     return fig
 
+
 # Define app and layout
-fig = create_figure(df)
+fig = create_figure(df, current_cluster_index)
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 
@@ -565,44 +566,27 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         
         if current_cluster_index >= len(df['class'].unique()):
             current_cluster_index = 0  # Reset to the first cluster
+        elif current_cluster_index < 0:
+            current_cluster_index = len(df['class'].unique()) - 1  # Reset to the last cluster
+            
         current_class = df['class'].unique()[current_cluster_index]
         sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         samples_json = json.dumps({"data": sampled_points, "current_index": 0})
         samples = json.loads(samples_json)
         sampled_point_index = 0
 
-
     if button_id == 'csv-test' and csv_path:
-        # Read the new CSV file
         new_df = pd.read_csv(csv_path)
-
-        # # Create a new figure based on the new data
-        # new_fig = go.Figure()
-        # new_fig.update_layout(paper_bgcolor="#171b26")
-        # colors = cycle(plotly.colors.sequential.Rainbow)
-        # for c in new_df['class'].unique():
-        #     dfi = new_df[new_df['class'] == c]
-        #     new_fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
-        #                                    mode='markers',
-        #                                    name=str(c),
-        #                                    customdata=dfi['sound_path'],
-        #                                    marker=dict(size=2),
-        #                                    marker_color=next(colors)))
-
-        new_fig = create_figure(new_df)
-
-        # Update the sample data state
+        new_fig = create_figure(new_df, current_cluster_index)
         new_samples_json = json.dumps({"data": new_df.to_dict('records'), "current_index": 0})
-
         return new_fig, "Scatter plot updated from new CSV file.", new_samples_json
 
     elif button_id == 'next-point':
         sampled_point_index = samples.get('current_index', 0) + 1
         if sampled_point_index >= 10:
-            # Move to the next cluster
             current_cluster_index += 1
             if current_cluster_index >= len(df['class'].unique()):
-                current_cluster_index = 0  # Reset to the first cluster
+                current_cluster_index = 0
             current_class = df['class'].unique()[current_cluster_index]
             sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
             samples_json = json.dumps({"data": sampled_points, "current_index": 0})
@@ -612,10 +596,9 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
     elif button_id == 'previous-point':
         sampled_point_index = samples.get('current_index', 0) - 1
         if sampled_point_index < 0:
-            # Move to the previous cluster
             current_cluster_index -= 1
             if current_cluster_index < 0:
-                current_cluster_index = len(df['class'].unique()) - 1  # Reset to the last cluster
+                current_cluster_index = len(df['class'].unique()) - 1
             current_class = df['class'].unique()[current_cluster_index]
             sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
             samples_json = json.dumps({"data": sampled_points, "current_index": 9})
@@ -640,7 +623,6 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
     elif button_id == 'file-dropdown':
         new_fig = update_figure(selected_file)
         current_csv_file = selected_file
-        # Initialize samples_json when file changes
         current_class = df['class'].unique()[current_cluster_index]
         sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
@@ -681,9 +663,8 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         play_sound(clicked_point)
         current_class = df[df['sound_path'] == clicked_point]['class'].iloc[0]
         status = f"Playing sample from clicked point in cluster: {current_class}"
-        return dash.no_update, status, samples_json  # Use dash.no_update for figure so that it doesn't change.
+        return dash.no_update, status, samples_json
 
-    # Update the sample index and audio status
     current_sample = samples["data"][sampled_point_index]
     play_sound(current_sample['sound_path'])
     current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
@@ -692,14 +673,10 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
     samples['current_index'] = sampled_point_index
     samples_json = json.dumps(samples)
 
-    # Highlight the current cluster in the scatter plot
-    for trace in fig.data:
-        if trace.name == str(current_class):
-            trace.marker.size = 10
-        else:
-            trace.marker.size = 5
+    new_fig = create_figure(df, current_cluster_index)
 
-    return fig, status, samples_json
+    return new_fig, status, samples_json
+
 
 @app.callback([Output('mel-spectrogram', 'src'),
                Output('waveform-plot', 'src')],
@@ -716,7 +693,7 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
 
     if samples_json is None:
         return dash.no_update, dash.no_update
-
+        
     samples = json.loads(samples_json)
     current_sample = samples["data"][samples["current_index"]]
     sound_file = current_sample['sound_path']
@@ -733,6 +710,8 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
     buf.seek(0)
     mel_spectrogram_base64 = base64.b64encode(buf.read()).decode()
 
+    plt.close()
+
     # Generate waveform plot using matplotlib and soundfile
     plt.figure(figsize=(12, 3))
     plt.plot(data)
@@ -745,7 +724,7 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
     buf.seek(0)
     waveform_base64 = base64.b64encode(buf.read()).decode()
 
-    matplotlib.pyplot.close()
+    plt.close()
 
     # Return the base64 encoded images as the src of the HTML image tags
     return f'data:image/png;base64,{mel_spectrogram_base64}', f'data:image/png;base64,{waveform_base64}'
@@ -902,7 +881,7 @@ def update_figure(selected_file):
     #                                marker=dict(size=2),
     #                                marker_color=next(colors)))
 
-    fig = create_figure(df)
+    fig = create_figure(df, current_cluster_index)
 
     return fig
 
