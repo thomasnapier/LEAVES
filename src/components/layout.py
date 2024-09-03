@@ -10,7 +10,7 @@ import dash_bootstrap_components as dbc
 import base64
 import os
 
-def create_layout(app):
+def create_layout(app, label_options):
     """Creates the layout for the Dash app."""
     logo_path = 'assets/logos/logo.png'
     encoded_logo = base64.b64encode(open(logo_path, 'rb').read()).decode('ascii')
@@ -85,14 +85,16 @@ def create_layout(app):
                 html.Div(id='upload-status', style={'color': 'var(--text-color)'}),
                 html.Button('Process Uploaded Data', id='process-data-button'),
                 dcc.Dropdown(id='file-dropdown', options=[], value=None),
-                html.Div(dcc.Graph(id='scatter-plot', style={'height': '600px', 'width': '100%', 'overflow': 'hidden'}), id='scatterplot-container'),
+                html.Div(dcc.Graph(id='scatter-plot', style={'height': '400px', 'width': '100%', 'overflow': 'hidden'}), id='scatterplot-container'),
                 html.Div([
-                    html.Div(id='checklist-title', children='Classes:'),
+                html.Div(id='checklist-title', children='Classes:'),
+                html.Div([
                     dcc.Checklist(id='class-labels-checklist',
-                                  options=[],
+                                  options=[{'label': label, 'value': label} for label in label_options],
                                   value=[],
                                   labelStyle={'display': 'inline-block', 'margin-right': '10px', 'color': 'var(--text-color)'}
                     )
+                ], id='annotation-tags-container')
                 ], id='checklist-container'),
                 html.Div([
                     html.Button('Save Annotations', id='control-button'),

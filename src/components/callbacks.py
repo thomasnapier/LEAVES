@@ -41,12 +41,12 @@ from components.utils import (
 
 UPLOAD_FOLDER_ROOT = "uploads"
 df = pd.read_csv('data/Undara-DryB.csv')
-label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
-                 "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
-                 "Wind (Strong)", "Wind (Light)"]
+# label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
+#                  "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
+#                  "Wind (Strong)", "Wind (Light)"]
 
 # Registering the callbacks
-def register_callbacks(app):
+def register_callbacks(app, label_options):
     """Register all the callbacks for the Dash app."""
 
     @app.callback(
@@ -146,10 +146,10 @@ def register_callbacks(app):
     @app.callback(
         Output('class-labels-checklist', 'value'),
         [Input('play-audio', 'n_clicks'),
-         Input('next-point', 'n_clicks'),
-         Input('previous-point', 'n_clicks')],
+        Input('next-point', 'n_clicks'),
+        Input('previous-point', 'n_clicks')],
         [State('hidden-sample-data', 'children'),
-         State('current-csv-file', 'data')]
+        State('current-csv-file', 'data')]
     )
     def update_checklist(play_clicks, next_clicks, prev_clicks, samples_json, current_csv_file):
         """Updates the checklist based on the current audio sample."""
@@ -228,30 +228,38 @@ def register_callbacks(app):
 
     @app.callback(
         [Output('scatter-plot', 'figure'),
-         Output('audio-status', 'children'),
-         Output('hidden-sample-data', 'children'),
-         Output('current-cluster-index', 'data'),
-         Output('sampled-point-index', 'data')],
+        Output('audio-status', 'children'),
+        Output('hidden-sample-data', 'children'),
+        Output('current-cluster-index', 'data'),
+        Output('sampled-point-index', 'data')],
         [Input('play-audio', 'n_clicks'),
-         Input('next-point', 'n_clicks'),
-         Input('previous-point', 'n_clicks'),
-         Input('next-cluster', 'n_clicks'),
-         Input('previous-cluster', 'n_clicks'),
-         Input('file-dropdown', 'value'),
-         Input('scatter-plot', 'clickData'),
-         Input('class-labels-checklist', 'value')],
+        Input('next-point', 'n_clicks'),
+        Input('previous-point', 'n_clicks'),
+        Input('next-cluster', 'n_clicks'),
+        Input('previous-cluster', 'n_clicks'),
+        Input('file-dropdown', 'value'),
+        Input('scatter-plot', 'clickData'),
+        Input('class-labels-checklist', 'value'),
+        Input('csv-test', 'children')],
         [State('hidden-sample-data', 'children'),
-         State('current-cluster-index', 'data'),
-         State('sampled-point-index', 'data'),
-         State('current-csv-file', 'data')]
+        State('current-cluster-index', 'data'),
+        State('sampled-point-index', 'data'),
+        State('current-csv-file', 'data')]
     )
-    def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, prev_cluster_clicks, selected_file, clickData, selected_labels, samples_json, current_cluster_index, sampled_point_index, current_csv_file):
+    def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, prev_cluster_clicks, selected_file, clickData, selected_labels, csv_test_data, samples_json, current_cluster_index, sampled_point_index, current_csv_file):
         """Processes the audio data based on user interactions."""
         ctx = dash.callback_context
         if not ctx.triggered:
             return no_update, no_update, no_update, no_update, no_update
 
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+        # Update CSV file if new data has been processed
+        if csv_test_data:
+            current_csv_file = csv_test_data
+
+        # Load the updated DataFrame based on the current CSV file
+        df = pd.read_csv(current_csv_file)
 
         # Initialize samples if necessary
         if samples_json is None or current_cluster_index >= len(df['class'].unique()):
@@ -317,9 +325,8 @@ def register_callbacks(app):
                 status = f"Playing sample {samples['current_index'] + 1} from cluster: {current_class}"
             return no_update, status, samples_json, current_cluster_index, sampled_point_index
 
-        elif button_id == 'file-dropdown':
-            new_fig = update_figure(selected_file)
-            current_csv_file = selected_file
+        elif button_id == 'file-dropdown' or button_id == 'csv-test':
+            new_fig = update_figure(current_csv_file)
             current_class = df['class'].unique()[current_cluster_index]
             sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
             new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
@@ -337,59 +344,37 @@ def register_callbacks(app):
 
         return new_fig, status, samples_json, current_cluster_index, sampled_point_index
 
-    @app.callback(
-        [Output('mel-spectrogram', 'src'),
-         Output('waveform-plot', 'src')],
-        [Input('play-audio', 'n_clicks'),
-         Input('next-point', 'n_clicks'),
-         Input('previous-point', 'n_clicks'),
-         Input('previous-cluster', 'n_clicks'),
-         Input('next-cluster', 'n_clicks')],
-        [State('hidden-sample-data', 'children')]
-    )
-    def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_clicks, next_cluster_clicks, samples_json):
-        """Updates the plots for the Mel spectrogram and waveform."""
-        if samples_json is None:
-            return no_update, no_update
-
-        samples = json.loads(samples_json)
-        current_sample = samples["data"][samples["current_index"]]
-        sound_file = current_sample['sound_path']
-
-        return generate_plots(sound_file)
 
     @app.callback(
-        [Output('upload-status', 'children'),
-        Output('uploaded-files-store', 'data')],
-        [Input('uploader', 'isCompleted')],
-        [State('uploader', 'fileNames'),
-        State('uploader', 'upload_id'),
-        State('uploaded-files-store', 'data')]
+        Output('upload-status', 'children'),
+        Input('uploader', 'isCompleted'),
+        State('uploader', 'fileNames'),
+        State('uploader', 'upload_id')
     )
-    def handle_file_upload(isCompleted, filenames, upload_id, uploaded_files):
-        """Handles the upload of audio files."""
+    def handle_file_upload(isCompleted, filenames, upload_id):
         if not isCompleted:
-            return "No files uploaded.", uploaded_files
+            return "No files uploaded."
 
         if filenames is None or len(filenames) == 0:
-            return "No files uploaded.", uploaded_files
+            return "No files uploaded."
 
         folder_path = os.path.join(UPLOAD_FOLDER_ROOT, upload_id)
+        uploaded_files = []
 
         for filename in filenames:
             file_path = os.path.join(folder_path, filename)
             uploaded_files.append(file_path)
 
-        return json.dumps(uploaded_files), uploaded_files
+        return json.dumps(uploaded_files)
 
     @app.callback(
-        Output('csv-test', 'children'),
+        [Output('csv-test', 'children'),
+         Output('current-csv-file', 'data')],
         Input('process-data-button', 'n_clicks'),
         State('upload-status', 'children'),
         prevent_initial_call=True
     )
     def process_uploaded_files(n_clicks, stored_file_paths_json):
-        """Processes the uploaded files and updates the CSV."""
         if n_clicks is None or stored_file_paths_json is None:
             raise PreventUpdate
 
@@ -400,11 +385,8 @@ def register_callbacks(app):
         for file_path in stored_file_paths:
             audio = AudioSegment.from_file(file_path, format=file_path.rsplit('.', 1)[1].lower())
             feature_vectors, sound_paths = process_audio_chunk(audio, os.path.dirname(file_path), file_path.rsplit('.', 1)[1].lower(), os.path.splitext(file_path)[0], duration=20)
-
             combined_feature_vectors.append(feature_vectors)
             combined_sound_paths.extend(sound_paths)
-
-            os.remove(file_path)
 
         combined_feature_vectors = np.vstack(combined_feature_vectors)
         reducer = umap.UMAP(n_components=3, random_state=0, n_neighbors=6, min_dist=0)
@@ -413,7 +395,7 @@ def register_callbacks(app):
         best_eps, best_min_samples, best_score, labels = calculate_silhouette_score(embedding)
 
         if len(embedding) != len(combined_sound_paths):
-            return "Error: Mismatch in lengths of embedding and sound paths."
+            return "Error: Mismatch in lengths of embedding and sound paths.", no_update
 
         results_df = pd.DataFrame({
             'x': embedding[:, 0],
@@ -427,6 +409,5 @@ def register_callbacks(app):
         results_csv_path = os.path.join(UPLOAD_FOLDER_ROOT, results_csv_filename)
         results_df.to_csv(results_csv_path, index=False)
 
-        stored_file_paths.clear()
-
-        return results_csv_path
+        # Update the current CSV file data store
+        return results_csv_path, results_csv_path
