@@ -1,4 +1,4 @@
-<p align="center"><img width=30% src="https://github.com/thomasnapier/LEAVES/blob/main/src/assets/logos/logo.png"></p>
+<p align="center"><img width=30% src="https://raw.githubusercontent.com/thomasnapier/LEAVES/blob/main/src/assets/logos/logo.png"></p>
 
 # LEAVES: Large-scale Ecoacoustics Annotation and Visualisation with Efficient Segmentation
 
@@ -9,9 +9,9 @@
 ## Basic Overview
 LEAVES is an advanced tool designed to streamline the process of annotating and visualizing large-scale natural soundscape datasets. It leverages cutting-edge machine learning and efficient data processing techniques to make ecoacoustic analysis faster, more accurate, and accessible to researchers and citizen scientists alike.
 
-![](https://github.com/thomasnapier/LEAVES/blob/main/src/assets/images/interface_1.png)
-![](https://github.com/thomasnapier/LEAVES/blob/main/src/assets/images/interface_2.png)
-![](https://github.com/thomasnapier/LEAVES/blob/main/src/assets/images/interface_3.png)
+![](https://raw.githubusercontent.com/thomasnapier/LEAVES/blob/main/src/assets/images/interface_1.png)
+![](https://raw.githubusercontent.com/thomasnapier/LEAVES/blob/main/src/assets/images/interface_2.png)
+![](https://raw.githubusercontent.com/thomasnapier/LEAVES/blob/main/src/assets/images/interface_3.png)
 
 ## Key Features
 - Efficiency-Optimized Labelling: Significantly reduces the time required to annotate large datasets.
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 5. Annotation: Users can annotate clusters of similar sounds, significantly speeding up the labelling process compared to manual methods.
 6. Visualization: Interactive 3D plots and spectrograms allow users to explore and understand the data in detail.
 
-<p align="center"><img width=50% src="https://github.com/thomasnapier/LEAVES/blob/main/src/assets/images/Scheme.png"></p>
+<p align="center"><img width=50% src="https://raw.githubusercontent.com/thomasnapier/LEAVES/blob/main/src/assets/images/Scheme.png"></p>
 
 ## Notes
   - **Technologies/Libraries**: Python3, Python Dash, Plotly, Librosa, Scikit-Learn
