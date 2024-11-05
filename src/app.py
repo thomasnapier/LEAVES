@@ -56,7 +56,7 @@ import os
 # pygame.mixer.init()
 
 # Load data
-df = pd.read_csv('data/Undara-DryB.csv')
+df = pd.read_csv('src/data/Undara-DryB.csv')
 # Load the classes from the text file
 def load_classes_from_file(file_path):
     with open(file_path, 'r') as f:
@@ -68,7 +68,7 @@ classes_file_path = os.path.join(base_dir, 'classes.txt')
 label_options = load_classes_from_file(classes_file_path)
 file_options = [{'label': file.split("\\")[-1], 'value': file} for file in glob.glob("data/*.csv")]
 current_cluster_index = 0
-current_csv_file = 'data/Undara-DryB.csv'
+current_csv_file = 'src/data/Undara-DryB.csv'
 sampled_point_index = 0
 samples_json = None
 uploaded_files = []
