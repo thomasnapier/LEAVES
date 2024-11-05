@@ -129,7 +129,7 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 
 # Load the logo image
-logo_path = 'assets/logos/logo.png'
+logo_path = 'src/assets/logos/logo.png'
 encoded_logo = base64.b64encode(open(logo_path, 'rb').read()).decode('ascii')
 
 # Initialize dash-uploader
