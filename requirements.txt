@@ -4,7 +4,6 @@ dash_bootstrap_components==1.4.1
 dash_uploader==0.6.0
 Flask==2.2.5
 librosa==0.10.1
-matplotlib==3.3.4
 matplotlib==3.7.0
 numpy==1.21.0
 pandas==1.4.2
