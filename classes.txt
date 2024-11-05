@@ -1,0 +1,12 @@
+Background Silence
+Birds
+Frogs
+Human Speech
+Insects
+Mammals
+Misc/Uncertain
+Rain (Heavy)
+Rain (Light)
+Vehicles (Aircraft/Cars)
+Wind (Strong)
+Wind (Light)

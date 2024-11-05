@@ -46,16 +46,26 @@ from sklearn.metrics import silhouette_score
 from sklearn.cluster import DBSCAN
 import numpy as np
 import tempfile
-
+import dash_uploader as du
+from pydub import AudioSegment
+from io import BytesIO
+import requests
+import os
 
 # Initialise pygame mixer
 pygame.mixer.init()
 
 # Load data
 df = pd.read_csv('data/Undara-DryB.csv')
-label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
-                 "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
-                 "Wind (Strong)", "Wind (Light)"]
+# Load the classes from the text file
+def load_classes_from_file(file_path):
+    with open(file_path, 'r') as f:
+        return [line.strip() for line in f if line.strip()]
+
+# Path to the classes file - adjust this to point to the correct location
+base_dir = os.path.dirname(os.path.dirname(__file__))  # This will give you the directory above `src`
+classes_file_path = os.path.join(base_dir, 'classes.txt')
+label_options = load_classes_from_file(classes_file_path)
 file_options = [{'label': file.split("\\")[-1], 'value': file} for file in glob.glob("data/*.csv")]
 current_cluster_index = 0
 current_csv_file = 'data/Undara-DryB.csv'
@@ -78,18 +88,18 @@ annotations_df = pd.DataFrame(columns=columns)
 def save_annotations_to_csv(df, filepath):
     df.to_csv(filepath, index=False)
 
-def create_figure(df):
-    # Initialize colors and figure
+def create_figure(df, current_cluster_index):
     classes = df['class'].unique()
     colors = plt.cm.get_cmap('tab10', len(classes))
     fig = go.Figure()
     for i, c in enumerate(classes):
         dfi = df[df['class'] == c]
+        marker_size = 10 if i == current_cluster_index else 5  # Highlight current cluster
         fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
                                 mode='markers',
                                 name="Cluster " + str(c),
                                 customdata=dfi['sound_path'],
-                                marker=dict(size=5, line=dict(width=0.1, color='black')),
+                                marker=dict(size=marker_size, line=dict(width=0.1, color='black')),
                                 marker_color=[f'rgba{colors(i)}' for _ in range(len(dfi))]))
         
     fig.update_layout(
@@ -112,14 +122,19 @@ def create_figure(df):
     
     return fig
 
+
 # Define app and layout
-fig = create_figure(df)
+fig = create_figure(df, current_cluster_index)
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 
 # Load the logo image
 logo_path = 'assets/logos/logo.png'
 encoded_logo = base64.b64encode(open(logo_path, 'rb').read()).decode('ascii')
+
+# Initialize dash-uploader
+UPLOAD_FOLDER_ROOT = "uploads"
+du.configure_upload(app, UPLOAD_FOLDER_ROOT)
 
 # Set default values
 default_values = {
@@ -271,29 +286,17 @@ app.layout = html.Div([
     ], id='settings-modal', style={'display': 'none', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '5%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)', 'max-height': '80vh', 'overflow-y': 'auto'}),
     html.Div([
         html.Div([
-            dcc.Loading(
-                id="loading-upload",
-                children=[
-                    dcc.Upload(
-                        id='upload-audio',
-                        children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-                        style={
-                            'width': '100%',
-                            'height': '60px',
-                            'lineHeight': '60px',
-                            'borderWidth': '1px',
-                            'borderStyle': 'dashed',
-                            'borderRadius': '5px',
-                            'textAlign': 'center',
-                            'margin-bottom': '10px',
-                            'color': 'var(--text-color)'
-                        },
-                        multiple=True
-                    ),
-                    html.Div(id='upload-file-info', style={'white-space': 'pre-line'}),
-                ],
-                type="circle",
-            ),
+            # Dash-Uploader component
+            du.Upload(
+            id='uploader',
+            text='Drag and Drop or Select Files',
+            text_completed='Upload Complete: ',
+            pause_button=True,
+            cancel_button=True,
+            max_file_size=1800,  # 1.8 GB
+            max_files = 100
+        ),
+        html.Div(id='upload-status', style={'color': 'var(--text-color)'}),
             html.Button('Process Uploaded Data', id='process-data-button'),
             dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value']),
             html.Div(dcc.Graph(id='scatter-plot', figure=fig, style={'height': '100%', 'width': '100%'}), id='scatterplot-container'),
@@ -565,44 +568,27 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         
         if current_cluster_index >= len(df['class'].unique()):
             current_cluster_index = 0  # Reset to the first cluster
+        elif current_cluster_index < 0:
+            current_cluster_index = len(df['class'].unique()) - 1  # Reset to the last cluster
+            
         current_class = df['class'].unique()[current_cluster_index]
         sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         samples_json = json.dumps({"data": sampled_points, "current_index": 0})
         samples = json.loads(samples_json)
         sampled_point_index = 0
 
-
     if button_id == 'csv-test' and csv_path:
-        # Read the new CSV file
         new_df = pd.read_csv(csv_path)
-
-        # # Create a new figure based on the new data
-        # new_fig = go.Figure()
-        # new_fig.update_layout(paper_bgcolor="#171b26")
-        # colors = cycle(plotly.colors.sequential.Rainbow)
-        # for c in new_df['class'].unique():
-        #     dfi = new_df[new_df['class'] == c]
-        #     new_fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
-        #                                    mode='markers',
-        #                                    name=str(c),
-        #                                    customdata=dfi['sound_path'],
-        #                                    marker=dict(size=2),
-        #                                    marker_color=next(colors)))
-
-        new_fig = create_figure(new_df)
-
-        # Update the sample data state
+        new_fig = create_figure(new_df, current_cluster_index)
         new_samples_json = json.dumps({"data": new_df.to_dict('records'), "current_index": 0})
-
         return new_fig, "Scatter plot updated from new CSV file.", new_samples_json
 
     elif button_id == 'next-point':
         sampled_point_index = samples.get('current_index', 0) + 1
         if sampled_point_index >= 10:
-            # Move to the next cluster
             current_cluster_index += 1
             if current_cluster_index >= len(df['class'].unique()):
-                current_cluster_index = 0  # Reset to the first cluster
+                current_cluster_index = 0
             current_class = df['class'].unique()[current_cluster_index]
             sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
             samples_json = json.dumps({"data": sampled_points, "current_index": 0})
@@ -612,10 +598,9 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
     elif button_id == 'previous-point':
         sampled_point_index = samples.get('current_index', 0) - 1
         if sampled_point_index < 0:
-            # Move to the previous cluster
             current_cluster_index -= 1
             if current_cluster_index < 0:
-                current_cluster_index = len(df['class'].unique()) - 1  # Reset to the last cluster
+                current_cluster_index = len(df['class'].unique()) - 1
             current_class = df['class'].unique()[current_cluster_index]
             sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
             samples_json = json.dumps({"data": sampled_points, "current_index": 9})
@@ -640,7 +625,6 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
     elif button_id == 'file-dropdown':
         new_fig = update_figure(selected_file)
         current_csv_file = selected_file
-        # Initialize samples_json when file changes
         current_class = df['class'].unique()[current_cluster_index]
         sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
@@ -681,9 +665,8 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         play_sound(clicked_point)
         current_class = df[df['sound_path'] == clicked_point]['class'].iloc[0]
         status = f"Playing sample from clicked point in cluster: {current_class}"
-        return dash.no_update, status, samples_json  # Use dash.no_update for figure so that it doesn't change.
+        return dash.no_update, status, samples_json
 
-    # Update the sample index and audio status
     current_sample = samples["data"][sampled_point_index]
     play_sound(current_sample['sound_path'])
     current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
@@ -692,14 +675,10 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
     samples['current_index'] = sampled_point_index
     samples_json = json.dumps(samples)
 
-    # Highlight the current cluster in the scatter plot
-    for trace in fig.data:
-        if trace.name == str(current_class):
-            trace.marker.size = 10
-        else:
-            trace.marker.size = 5
+    new_fig = create_figure(df, current_cluster_index)
 
-    return fig, status, samples_json
+    return new_fig, status, samples_json
+
 
 @app.callback([Output('mel-spectrogram', 'src'),
                Output('waveform-plot', 'src')],
@@ -716,7 +695,7 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
 
     if samples_json is None:
         return dash.no_update, dash.no_update
-
+        
     samples = json.loads(samples_json)
     current_sample = samples["data"][samples["current_index"]]
     sound_file = current_sample['sound_path']
@@ -733,6 +712,8 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
     buf.seek(0)
     mel_spectrogram_base64 = base64.b64encode(buf.read()).decode()
 
+    plt.close()
+
     # Generate waveform plot using matplotlib and soundfile
     plt.figure(figsize=(12, 3))
     plt.plot(data)
@@ -745,67 +726,114 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
     buf.seek(0)
     waveform_base64 = base64.b64encode(buf.read()).decode()
 
-    matplotlib.pyplot.close()
+    plt.close()
 
     # Return the base64 encoded images as the src of the HTML image tags
     return f'data:image/png;base64,{mel_spectrogram_base64}', f'data:image/png;base64,{waveform_base64}'
 
+# @app.callback(
+#     Output('temporary-storage', 'children'),
+#     Input('upload-audio', 'contents'),
+#     State('upload-audio', 'filename'),
+#     State('temporary-storage', 'children')
+# )
+# def store_uploaded_files(contents, filenames, stored_files):
+#     if contents is not None:
+#         # Use a persistent file to store the paths
+#         if stored_files is None:
+#             temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.txt')
+#             temp_file_path = temp_file.name
+#             temp_file.close()
+#         else:
+#             temp_file_path = stored_files
+
+#         with open(temp_file_path, 'a') as temp_file:
+#             for content, filename in zip(contents, filenames):
+#                 data = content.split(',')[1]
+#                 decoded = base64.b64decode(data)
+#                 file_path = os.path.join(TEMP_FOLDER, filename)
+#                 with open(file_path, 'wb') as fp:
+#                     fp.write(decoded)
+#                 temp_file.write(file_path + '\n')
+
+#         return temp_file_path
+
+#     return stored_files
+
 @app.callback(
-    Output('temporary-storage', 'children'),
-    Input('upload-audio', 'contents'),
-    State('upload-audio', 'filename'),
-    State('temporary-storage', 'children')
+    Output('upload-status', 'children'),
+    [Input('uploader', 'isCompleted')],
+    [State('uploader', 'fileNames'),
+     State('uploader', 'upload_id')]
 )
-def store_uploaded_files(contents, filenames, stored_files):
-    if contents is not None:
-        # Use a persistent file to store the paths
-        if stored_files is None:
-            temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.txt')
-            temp_file_path = temp_file.name
-            temp_file.close()
-        else:
-            temp_file_path = stored_files
+def handle_file_upload(isCompleted, filenames, upload_id):
+    if not isCompleted:
+        return "No files uploaded."
 
-        with open(temp_file_path, 'a') as temp_file:
-            for content, filename in zip(contents, filenames):
-                data = content.split(',')[1]
-                decoded = base64.b64decode(data)
-                file_path = os.path.join(TEMP_FOLDER, filename)
-                with open(file_path, 'wb') as fp:
-                    fp.write(decoded)
-                temp_file.write(file_path + '\n')
+    if filenames is None or len(filenames) == 0:
+        return "No files uploaded."
 
-        return temp_file_path
+    # The folder path where files are uploaded
+    folder_path = os.path.join(UPLOAD_FOLDER_ROOT, upload_id)
 
-    return stored_files
+    # Save full file paths in a temporary storage for later processing
+    for filename in filenames:
+        file_path = os.path.join(folder_path, filename)
+        uploaded_files.append(file_path)
+    
+    # Store the paths in a hidden div or another suitable storage element
+    return json.dumps(uploaded_files)
+
 
 @app.callback(
     Output('csv-test', 'children'),
     Input('process-data-button', 'n_clicks'),
-    State('temporary-storage', 'children'),
+    State('upload-status', 'children'),
     prevent_initial_call=True
 )
-def process_all_uploaded_files(n_clicks, stored_files):
-    if n_clicks is None or stored_files is None:
+def process_uploaded_files(n_clicks, stored_file_paths_json):
+    # Ensure the button is clicked, and that uploaded file paths are provided
+    if n_clicks is None or not stored_file_paths_json:
+        print("No button click detected or no file paths provided.")
         raise PreventUpdate
 
-    # Read file paths from the temporary file
-    with open(stored_files, 'r') as file:
-        file_paths = file.read().splitlines()
+    try:
+        stored_file_paths = json.loads(stored_file_paths_json)
+    except json.JSONDecodeError:
+        print("Error decoding JSON from upload-status state.")
+        return "Error: Unable to read uploaded file paths."
+
+    # If there are no uploaded files to process, notify the user
+    if not stored_file_paths:
+        print("No files to process.")
+        return "No files uploaded to process."
 
     combined_feature_vectors = []
     combined_sound_paths = []
 
-    for file_path in file_paths:
-        audio = AudioSegment.from_file(file_path, format=file_path.rsplit('.', 1)[1].lower())
-        feature_vectors, sound_paths = process_audio_chunk(audio, os.path.dirname(file_path), file_path.rsplit('.', 1)[1].lower(), os.path.splitext(file_path)[0], duration=20)
-        
-        # Stack feature_vectors and extend sound_paths
-        combined_feature_vectors.append(feature_vectors)
-        combined_sound_paths.extend(sound_paths)
+    # Iterate through the stored file paths and process each file
+    for file_path in stored_file_paths:
+        if not os.path.exists(file_path):
+            print(f"Error: File not found - {file_path}")
+            continue  # Skip missing files
 
-        # Clean up the temporary source file
-        os.remove(file_path)
+        try:
+            # Load the audio file
+            audio = AudioSegment.from_file(file_path, format=file_path.rsplit('.', 1)[1].lower())
+            # Process audio and extract features
+            feature_vectors, sound_paths = process_audio_chunk(audio, os.path.dirname(file_path), file_path.rsplit('.', 1)[1].lower(), os.path.splitext(file_path)[0], duration=20)
+            
+            # Append extracted features and sound paths
+            combined_feature_vectors.append(feature_vectors)
+            combined_sound_paths.extend(sound_paths)
+        except Exception as e:
+            print(f"Error processing file {file_path}: {e}")
+            continue
+
+    # If no valid features were extracted, return a message to the user
+    if not combined_feature_vectors:
+        print("No valid audio files processed.")
+        return "No valid audio files processed."
 
     # Convert list of arrays to a single 2D array for feature_vectors
     combined_feature_vectors = np.vstack(combined_feature_vectors)
@@ -819,6 +847,7 @@ def process_all_uploaded_files(n_clicks, stored_files):
 
     # Create a DataFrame with the results
     if len(embedding) != len(combined_sound_paths):
+        print("Error: Mismatch in lengths of embedding and sound paths.")
         return "Error: Mismatch in lengths of embedding and sound paths."
 
     results_df = pd.DataFrame({
@@ -831,12 +860,17 @@ def process_all_uploaded_files(n_clicks, stored_files):
 
     # Save the results to a CSV file
     results_csv_filename = 'combined_umap_dbscan.csv'
-    results_csv_path = os.path.join(TEMP_FOLDER, results_csv_filename)
+    results_csv_path = os.path.join(UPLOAD_FOLDER_ROOT, results_csv_filename)
     results_df.to_csv(results_csv_path, index=False)
 
-    # Clear the global list after processing
-    uploaded_files.clear()
+    # Clear the stored file paths after processing
+    stored_file_paths.clear()
+
+    print(f"Processing complete. Results saved to {results_csv_path}.")
     return results_csv_path
+
+
+
 
 # # Flask route for serving the results CSV file
 # @app.server.route('/download/<path:filename>')
@@ -848,34 +882,51 @@ def process_all_uploaded_files(n_clicks, stored_files):
 
 #     return send_from_directory(TEMP_FOLDER, filename, as_attachment=True)
 
-@app.callback(
-    Output('upload-file-info', 'children'),
-    [Input('upload-audio', 'filename')],
-    [State('temporary-storage', 'children')]
-)
-def update_file_info(filenames, stored_files):
-    if not filenames:
-        return 'No new files uploaded.'
+# @app.callback(
+#     Output('upload-file-info', 'children'),
+#     [Input('upload-audio', 'filename')],
+#     [State('temporary-storage', 'children')]
+# )
+# def update_file_info(filenames, stored_files):
+#     if not filenames:
+#         return 'No new files uploaded.'
 
-    # Read the stored file paths
-    all_files = []
-    if stored_files:
-        with open(stored_files, 'r') as file:
-            all_files = file.read().splitlines()
+#     # Read the stored file paths
+#     all_files = []
+#     if stored_files:
+#         with open(stored_files, 'r') as file:
+#             all_files = file.read().splitlines()
 
-    # Combine the new filenames with the existing ones
-    new_files = [os.path.basename(f) for f in filenames]  # Extract just the file names
-    all_files += new_files
+#     # Combine the new filenames with the existing ones
+#     new_files = [os.path.basename(f) for f in filenames]  # Extract just the file names
+#     all_files += new_files
 
-    # Format the display string
-    display_str = "" #f"Total Files Uploaded: {len(all_files)}".join(all_files)
+#     # Format the display string
+#     display_str = "" #f"Total Files Uploaded: {len(all_files)}".join(all_files)
 
-    return display_str
+#     return display_str
 
 # Functions
-def play_sound(sound_file):
-    pygame.mixer.music.load(sound_file)
-    pygame.mixer.music.play()
+def play_sound(sound_url):
+    try:
+        # Fetch the audio file from the URL
+        response = requests.get(sound_url)
+        response.raise_for_status()  # Check if the download was successful
+
+        audio_data = BytesIO(response.content)
+
+        # Verify if audio data is valid
+        audio_segment = AudioSegment.from_file(audio_data, format="wav")
+        
+        # Save to a temporary file and play with ffmpeg
+        temp_audio_path = "temp_audio.wav"
+        audio_segment.export(temp_audio_path, format="wav")
+        os.system(f"ffplay -nodisp -autoexit {temp_audio_path}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to download the audio file: {e}")
+    except Exception as e:
+        print(f"Could not decode the audio file: {e}")
     
 def pause_sound():
     pygame.mixer.music.pause()
@@ -902,7 +953,7 @@ def update_figure(selected_file):
     #                                marker=dict(size=2),
     #                                marker_color=next(colors)))
 
-    fig = create_figure(df)
+    fig = create_figure(df, current_cluster_index)
 
     return fig
 
@@ -936,7 +987,8 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
         chunk_data = audio[start_time:end_time]
 
         chunk_file_name = f'{original_filename}_{chunk_index}.{file_format}'
-        chunk_file_path = os.path.join(output_folder, chunk_file_name)
+        chunk_file_path = chunk_file_name
+        
 
         chunk_data.export(chunk_file_path, format=file_format)
         total_time_ms += chunk_length_ms
@@ -958,7 +1010,7 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
     # Save feature vectors to CSV
     paths = pd.DataFrame(sound_paths)
     df = pd.concat([feature_vectors, paths], ignore_index=True, sort=False, axis=1)
-    features_csv_path = os.path.join(output_folder, f'{original_filename}_features.csv')
+    features_csv_path =  f'{original_filename}_features.csv'
     df.to_csv(features_csv_path, index=False)
 
     return feature_vectors, sound_paths
