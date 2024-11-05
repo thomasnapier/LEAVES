@@ -1069,6 +1069,6 @@ def create_zip_file(output_folder, original_filename, csv_file_path):
     return zip_path
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
 
 
