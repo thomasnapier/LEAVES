@@ -66,7 +66,7 @@ def load_classes_from_file(file_path):
 base_dir = os.path.dirname(os.path.dirname(__file__))  # This will give you the directory above `src`
 classes_file_path = os.path.join(base_dir, 'classes.txt')
 label_options = load_classes_from_file(classes_file_path)
-file_options = [{'label': file.split("\\")[-1], 'value': file} for file in glob.glob("data/*.csv")]
+file_options = [{"label": filename, "value": filename} for filename in os.listdir("src/data/")]
 current_cluster_index = 0
 current_csv_file = 'src/data/Undara-DryB.csv'
 sampled_point_index = 0
