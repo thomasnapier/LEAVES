@@ -53,7 +53,7 @@ import requests
 import os
 
 # Initialise pygame mixer
-pygame.mixer.init()
+# pygame.mixer.init()
 
 # Load data
 df = pd.read_csv('data/Undara-DryB.csv')
