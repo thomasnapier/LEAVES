@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LEAVES User Guide for ecoacoustic data annotation and visualization.">
+    <meta name="keywords" content="LEAVES, ecoacoustics, user guide, soundscape analysis, annotation, visualization">
+    <meta name="author" content="Thomas J. Napier">
+    <title>LEAVES User Guide</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="light">
+
+<!-- Top Banner with Logo and Navigation -->
+<div id="top-banner">
+    <img id="logo" src="./src/assets/logos/logo.png" alt="LEAVES Logo">
+    <div id="top-banner-title">LEAVES User Guide</div>
+    <nav id="navbar">
+        <a href="index.html">Home</a>
+    </nav>
+</div>
+
+<!-- Main Container -->
+<div id="main-container">
+    <section id="collections" style="padding: 2rem;">
+        <h1>Collections</h1>
+        <h2>Recordings Upload</h2>
+        <p>Administrators can access the administration interface and upload recordings to specific collections by clicking the "upload" button. The date and time of a recording can be automatically extracted from the filename when in the format YYYMMDD_HHMMSS.</p>
+        <img src="images/recordings_admin.png" alt="Recordings administrative interface" width="80%">
+
+        <h2>General Organisation</h2>
+        <p>Recordings are organized in collections accessible from the top drop-down menu. In list view, recordings can be played back directly and some metadata are displayed.</p>
+        <img src="images/list_view.png" alt="Tag window" width="80%">
+    </section>
+
+    <section id="player" style="padding: 2rem;">
+        <h1>Player</h1>
+        <p>The spectrogram is the most prominent part of the player, visualizing sound in time, frequency, and amplitude.</p>
+        <img src="images/player.png" alt="Player interface" width="80%">
+    </section>
+
+    <section id="tags" style="padding: 2rem;">
+        <h1>Tags (Annotations)</h1>
+        <p>Tags appear as boxes overlaid on the spectrogram. Users can edit, zoom, and estimate call distances for these tags.</p>
+        <img src="images/tag_window.png" alt="Tag window" width="80%">
+    </section>
+
+    <section id="admin" style="padding: 2rem;">
+        <h1>Administration</h1>
+        <h2>Users</h2>
+        <p>Administrators can create users, set privileges, and manage user access to specific collections.</p>
+        <img src="images/users_admin.png" alt="Users administrative interface" width="80%">
+    </section>
+</div>
+
+<!-- Footer -->
+<footer style="text-align: center; padding: 1rem; background-color: var(--banner-background-color); color: var(--banner-text-color);">
+    <p>LEAVES @ Thomas J. Napier, All rights reserved.</p>
+</footer>
+
+</body>
+</html>

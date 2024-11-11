@@ -1,0 +1,354 @@
+/* Root Styles */
+:root {
+    --background-color: #171b26;
+    --text-color: #ffffff;
+    --banner-background-color: #333333;
+    --banner-text-color: #ffffff;
+    --border-color: #444444;
+    --button-background-color: #4A76A8;
+    --button-text-color: #ffffff;
+    --button-hover-background-color: #5A8AC8;
+    --button-focus-border-color: #3E68FF;
+}
+
+/* Base Layout */
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Top Banner */
+#top-banner {
+    background-color: var(--banner-background-color);
+    color: var(--banner-text-color);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+}
+
+#logo {
+    width: 5%;
+}
+
+#top-banner-title {
+    font-size: 2em;
+    padding-left: 10px;
+}
+
+/* Main Container */
+#main-container {
+    flex: 1;
+    padding: 20px;
+}
+
+/* Section Headers */
+h1, h2 {
+    color: var(--text-color);
+}
+
+/* Button Styles */
+button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 220ms ease-in-out;
+}
+
+button:hover {
+    background-color: var(--button-hover-background-color);
+}
+
+button:focus {
+    box-shadow: 0 0 0 4px var(--button-focus-border-color);
+}
+
+/* Video */
+video {
+    max-width: 100%;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+/* List Styles */
+ul {
+    list-style-type: disc;
+    margin-left: 20px;
+}
+
+/* Pre-formatted Text */
+pre {
+    background-color: #333;
+    color: #fff;
+    padding: 10px;
+    border-radius: 5px;
+    overflow: auto;
+}
+
+/* Badge Styles */
+.badges img {
+    margin: 0 5px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #top-banner-title {
+        font-size: 1.5em;
+    }
+}
+
+.cta-button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    padding: 15px 30px;
+    font-size: 1.2em;
+    text-decoration: none;
+    border-radius: 8px;
+    margin: 10px;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.cta-button:hover {
+    background-color: var(--button-hover-background-color);
+}
+
+/* Navigation Styles */
+#navbar {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+#navbar a {
+    text-decoration: none;
+    color: var(--banner-text-color);
+    padding: 10px;
+    transition: color 0.3s;
+}
+
+#navbar a:hover {
+    color: var(--button-hover-background-color);
+}
+
+/* Key Features Section */
+.feature-section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 2rem 0;
+    color: black;
+}
+
+.light-bg {
+    background-color: #f9f9f9;
+}
+
+.dark-bg {
+    background-color: #333333;
+    color: #ffffff;
+}
+
+.feature-image, .feature-text {
+    flex: 1 1 50%;
+    padding: 1rem;
+}
+
+.feature-text h3 {
+    margin-top: 0;
+}
+
+.feature-image img {
+    width: 100%;
+    border-radius: 5px;
+    margin-left: 20%;
+    margin-right: 20%;
+}
+
+/* CTA Button Styles */
+.cta-button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    padding: 15px 30px;
+    font-size: 1.2em;
+    text-decoration: none;
+    border-radius: 8px;
+    margin: 10px;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.cta-button:hover {
+    background-color: var(--button-hover-background-color);
+}
+
+/* Navbar Styles */
+#navbar {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+#navbar a {
+    text-decoration: none;
+    color: var(--banner-text-color);
+    padding: 10px;
+    transition: color 0.3s;
+}
+
+#navbar a:hover {
+    color: var(--button-hover-background-color);
+}
+
+
+/* Footer */
+footer {
+    background-color: var(--banner-background-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+}
+
+.footer-icons img {
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.footer-icons a:hover img {
+    filter: brightness(1.2);
+}
+
+/* CTA Button Styles */
+.cta-button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    padding: 15px 30px;
+    font-size: 1.2em;
+    text-decoration: none;
+    border-radius: 8px;
+    margin: 10px;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.cta-button:hover {
+    background-color: var(--button-hover-background-color);
+}
+
+/* Navbar Styles */
+#navbar {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+#navbar a {
+    text-decoration: none;
+    color: var(--banner-text-color);
+    padding: 10px;
+    transition: color 0.3s;
+}
+
+#navbar a:hover {
+    color: var(--button-hover-background-color);
+}
+
+/* Key Features Section */
+.feature-section {
+    display: flex;
+    padding: 2rem 0;
+}
+
+.feature-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: 1rem;
+}
+
+.reverse {
+    flex-direction: row-reverse;
+}
+
+.light-bg {
+    background-color: #f9f9f9;
+}
+
+.dark-bg {
+    background-color: #333333;
+    color: #ffffff;
+}
+
+.feature-text, .feature-image {
+    flex: 1 1 50%;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.feature-text h3 {
+    font-size: 1.6em;
+    margin-top: 0;
+    margin-bottom: 0.5em;
+}
+
+.feature-text p {
+    font-size: 1.2em;
+    line-height: 1.6;
+}
+
+.feature-image img {
+    width: 100%;
+    max-width: 800px;
+    border-radius: 5px;
+}
+
+/* Footer */
+footer {
+    background-color: var(--banner-background-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    box-sizing: border-box;
+}
+
+.footer-icons img {
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.footer-icons a:hover img {
+    filter: brightness(1.2);
+}
+
+/* CTA Button Styles */
+.cta-button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    padding: 15px 30px;
+    font-size: 1.2em;
+    text-decoration: none;
+    border-radius: 8px;
+    margin: 10px;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.cta-button:hover {
+    background-color: var(--button-hover-background-color);
+}
+
