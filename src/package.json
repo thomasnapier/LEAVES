@@ -1,0 +1,36 @@
+{
+  "name": "leaves-app",
+  "version": "1.0.0",
+  "description": "LEAVES Audio Labeller",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.example.leaves",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules"
+    ],
+    "win": {
+      "icon": "assets/icons/app-icon.ico",
+      "target": "nsis"
+    },
+    "mac": {
+      "icon": "assets/icons/app-icon.ico",
+      "target": "dmg"
+    },
+    "linux": {
+      "icon": "assets/icons/app-icon.ico",
+      "target": "AppImage"
+    }
+  },
+  "devDependencies": {
+    "electron": "^25.0.0",
+    "electron-builder": "^23.6.0"
+  }
+}
