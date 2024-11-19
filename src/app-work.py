@@ -164,6 +164,7 @@ default_values = {
 }
 
 app.layout = html.Div([
+    dcc.Store(id='config-store', data=default_values),
     html.Div([
         html.Img(src=f'data:image/png;base64,{encoded_logo}', id='logo'),
         html.Span('LEAVES', id='top-banner-title')
@@ -442,37 +443,104 @@ def toggle_clustering_algorithm(n_dbscan, n_kmeans, n_agglomerative):
         button_id == 'clustering-agglomerative'
     ]
 
-# Callback for synchronizing sliders and input values
 @app.callback(
-    [Output('data-sampling-slider', 'value'),
-     Output('data-sampling-input', 'value')],
-    [Input('data-sampling-slider', 'value'),
-     Input('data-sampling-input', 'value')]
+    [
+        Output('windowing-slider', 'value'),
+        Output('windowing-input', 'value'),
+        Output('data-sampling-slider', 'value'),
+        Output('data-sampling-input', 'value'),
+        Output('n-neighbours-slider', 'value'),
+        Output('n-neighbours-input', 'value'),
+        Output('min-dist-slider', 'value'),
+        Output('min-dist-input', 'value'),
+        Output('eps-slider', 'value'),
+        Output('eps-input', 'value'),
+        Output('min-samples-slider', 'value'),
+        Output('min-samples-input', 'value'),
+        Output('config-store', 'data')
+    ],
+    [
+        Input('windowing-slider', 'value'),
+        Input('windowing-input', 'value'),
+        Input('data-sampling-slider', 'value'),
+        Input('data-sampling-input', 'value'),
+        Input('n-neighbours-slider', 'value'),
+        Input('n-neighbours-input', 'value'),
+        Input('min-dist-slider', 'value'),
+        Input('min-dist-input', 'value'),
+        Input('eps-slider', 'value'),
+        Input('eps-input', 'value'),
+        Input('min-samples-slider', 'value'),
+        Input('min-samples-input', 'value'),
+        Input('config-store', 'data')
+    ]
 )
-def sync_slider_input(slider_value, input_value):
+def handle_settings(windowing_slider, windowing_input,
+                    data_sampling_slider, data_sampling_input,
+                    n_neighbours_slider, n_neighbours_input,
+                    min_dist_slider, min_dist_input,
+                    eps_slider, eps_input,
+                    min_samples_slider, min_samples_input,
+                    config_data):
     ctx = dash.callback_context
     if not ctx.triggered:
-        raise PreventUpdate
+        # On load: Populate all sliders/inputs from config_store
+        return (
+            config_data['windowing'], config_data['windowing'],
+            config_data['data-sampling'], config_data['data-sampling'],
+            config_data['n-neighbours'], config_data['n-neighbours'],
+            config_data['min-dist'], config_data['min-dist'],
+            config_data['eps'], config_data['eps'],
+            config_data['min-samples'], config_data['min-samples'],
+            config_data
+        )
 
-    input_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    if input_id == 'data-sampling-slider':
-        return slider_value, slider_value
-    elif input_id == 'data-sampling-input':
-        return input_value, input_value
+    # Sync triggered input with config_store
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    input_to_config_key = {
+        'windowing-slider': ('windowing', windowing_slider),
+        'windowing-input': ('windowing', windowing_input),
+        'data-sampling-slider': ('data-sampling', data_sampling_slider),
+        'data-sampling-input': ('data-sampling', data_sampling_input),
+        'n-neighbours-slider': ('n-neighbours', n_neighbours_slider),
+        'n-neighbours-input': ('n-neighbours', n_neighbours_input),
+        'min-dist-slider': ('min-dist', min_dist_slider),
+        'min-dist-input': ('min-dist', min_dist_input),
+        'eps-slider': ('eps', eps_slider),
+        'eps-input': ('eps', eps_input),
+        'min-samples-slider': ('min-samples', min_samples_slider),
+        'min-samples-input': ('min-samples', min_samples_input)
+    }
+
+    if triggered_id in input_to_config_key:
+        config_key, value = input_to_config_key[triggered_id]
+        config_data[config_key] = value
+
+    # Update values for all sliders/inputs
+    return (
+        config_data['windowing'], config_data['windowing'],
+        config_data['data-sampling'], config_data['data-sampling'],
+        config_data['n-neighbours'], config_data['n-neighbours'],
+        config_data['min-dist'], config_data['min-dist'],
+        config_data['eps'], config_data['eps'],
+        config_data['min-samples'], config_data['min-samples'],
+        config_data
+    )
+
 
 # Callback for toggle switches
-@app.callback(
-    [Output('preprocessing-sds', 'value'),
-     Output('preprocessing-stw', 'value'),
-     Output('feature-extraction-mmn', 'value'),
-     Output('feature-extraction-imd', 'value')],
-    [Input('preprocessing-sds', 'value'),
-     Input('preprocessing-stw', 'value'),
-     Input('feature-extraction-mmn', 'value'),
-     Input('feature-extraction-imd', 'value')]
-)
-def sync_toggles(sds, stw, mmn, imd):
-    return sds, stw, mmn, imd
+# @app.callback(
+#     [Output('preprocessing-sds', 'value'),
+#      Output('preprocessing-stw', 'value'),
+#      Output('feature-extraction-mmn', 'value'),
+#      Output('feature-extraction-imd', 'value')],
+#     [Input('preprocessing-sds', 'value'),
+#      Input('preprocessing-stw', 'value'),
+#      Input('feature-extraction-mmn', 'value'),
+#      Input('feature-extraction-imd', 'value')]
+# )
+# def sync_toggles(sds, stw, mmn, imd):
+#     return sds, stw, mmn, imd
 
 @app.callback(
     Output('class-labels-checklist', 'value'),
