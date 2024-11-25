@@ -52,8 +52,6 @@ import dash_uploader as du
 import sys
 
 
-UPLOADS_DIRECTORY = "uploads"  # Define the main uploads folder
-
 # Determine the base path of the application
 def get_base_path():
     if getattr(sys, 'frozen', False):  # If bundled as an executable
@@ -635,7 +633,8 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
 
     # Initialize samples if necessary
     if samples_json is None or current_cluster_index >= len(df['class'].unique()):
-        sampled_points = get_sampled_points(df, current_cluster_index)
+        current_class = df['class'].unique()[current_cluster_index]
+        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         samples_json = json.dumps({"data": sampled_points, "current_index": 0})
 
     samples = json.loads(samples_json)
@@ -651,8 +650,10 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         elif current_cluster_index < 0:
             current_cluster_index = len(df['class'].unique()) - 1  # Reset to the last cluster
             
-        sampled_points = get_sampled_points(df, current_cluster_index)
+        current_class = df['class'].unique()[current_cluster_index]
+        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         samples_json = json.dumps({"data": sampled_points, "current_index": 0})
+        samples = json.loads(samples_json)
         sampled_point_index = 0
 
     if button_id == 'csv-test' and csv_path:
@@ -662,20 +663,28 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         return new_fig, "Scatter plot updated from new CSV file.", new_samples_json
 
     elif button_id == 'next-point':
-        sampled_point_index += 1
-        if sampled_point_index >= len(samples["data"]):  # If end of samples, switch to next cluster
-            current_cluster_index = (current_cluster_index + 1) % len(df['class'].unique())
-            sampled_points = get_sampled_points(df, current_cluster_index)
+        sampled_point_index = samples.get('current_index', 0) + 1
+        if sampled_point_index >= 10:
+            current_cluster_index += 1
+            if current_cluster_index >= len(df['class'].unique()):
+                current_cluster_index = 0
+            current_class = df['class'].unique()[current_cluster_index]
+            sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
             samples_json = json.dumps({"data": sampled_points, "current_index": 0})
+            samples = json.loads(samples_json)
             sampled_point_index = 0
 
     elif button_id == 'previous-point':
-        sampled_point_index -= 1
-        if sampled_point_index < 0:  # If beginning of samples, switch to previous cluster
-            current_cluster_index = (current_cluster_index - 1) % len(df['class'].unique())
-            sampled_points = get_sampled_points(df, current_cluster_index)
-            samples_json = json.dumps({"data": sampled_points, "current_index": len(sampled_points) - 1})
-            sampled_point_index = len(sampled_points) - 1
+        sampled_point_index = samples.get('current_index', 0) - 1
+        if sampled_point_index < 0:
+            current_cluster_index -= 1
+            if current_cluster_index < 0:
+                current_cluster_index = len(df['class'].unique()) - 1
+            current_class = df['class'].unique()[current_cluster_index]
+            sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
+            samples_json = json.dumps({"data": sampled_points, "current_index": 9})
+            samples = json.loads(samples_json)
+            sampled_point_index = 9
 
     elif button_id == 'play-audio':
         if pygame.mixer.music.get_busy():
@@ -693,14 +702,11 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         return dash.no_update, status, samples_json
 
     elif button_id == 'file-dropdown':
-        # Update the figure and set the selected file as the current CSV
         new_fig = update_figure(selected_file)
         current_csv_file = selected_file
-
-        # Use the helper function to sample points based on the current cluster index
-        sampled_points = get_sampled_points(df, current_cluster_index)
+        current_class = df['class'].unique()[current_cluster_index]
+        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
         new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
-
         return new_fig, "File changed. Playing from the first point in the new cluster.", new_samples_json
     
     elif button_id == 'control-button': 
@@ -734,30 +740,10 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         return dash.no_update, "Labels saved.", dash.no_update
     
     elif clickData:
-        # Normalize clicked point path, extract filename, and remove file extension
-        clicked_point = clickData['points'][0]['customdata'].replace("\\", "/")
-        clicked_filename = clicked_point.split("/")[-1].split('.')[0]  # Remove extension
-
-        # Normalize DataFrame sound_path, extract filenames, and remove extensions
-        df['sound_path'] = df['sound_path'].str.replace("\\", "/").apply(lambda x: x.split("/")[-1].split('.')[0])
-
-        # Debugging information
-        print("Click data:", clickData)
-        print("Clicked point full path:", clicked_point)
-        print("Extracted filename without extension:", clicked_filename)
-        print("Sample sound_path values without extensions:", df['sound_path'].head(10))
-        print("Matching rows:", df[df['sound_path'] == clicked_filename])
-
-        # Attempt to locate the clicked filename in df['sound_path']
-        filtered_df = df[df['sound_path'] == clicked_filename]
-        if not filtered_df.empty:
-            current_class = filtered_df['class'].iloc[0]
-            status = f"Playing sample from clicked point in cluster: {current_class}"
-            play_sound(clicked_point)
-        else:
-            current_class = "Unknown"
-            status = "No matching sound path found. Playing sample failed."
-
+        clicked_point = clickData['points'][0]['customdata']
+        play_sound(clicked_point)
+        current_class = df[df['sound_path'] == clicked_point]['class'].iloc[0]
+        status = f"Playing sample from clicked point in cluster: {current_class}"
         return dash.no_update, status, samples_json
 
     current_sample = samples["data"][sampled_point_index]
@@ -791,22 +777,20 @@ def get_sampled_points(df, current_cluster_index, sample_size=10):
     actual_sample_size = min(sample_size, len(class_subset))
     return class_subset.sample(actual_sample_size, replace=False).to_dict('records')
 
-@app.callback([Output('mel-spectrogram', 'src'),
-               Output('waveform-plot', 'src')],
-              [Input('play-audio', 'n_clicks'),
-               Input('next-point', 'n_clicks'),
-               Input('previous-point', 'n_clicks'),
-               Input('previous-cluster', 'n_clicks'),
-               Input('next-cluster', 'n_clicks')],
-              [State('hidden-sample-data', 'children')])
-def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_clicks, next_cluster_clicks, samples_json):
+@app.callback(
+    [Output('mel-spectrogram', 'src'),
+     Output('waveform-plot', 'src')],
+    Input('hidden-sample-data', 'children'),
+    prevent_initial_call=True
+)
+def update_plots(samples_json):
     # Clear previous figure
     plt.clf()
     matplotlib.pyplot.close()
 
     if samples_json is None:
         return dash.no_update, dash.no_update
-        
+
     samples = json.loads(samples_json)
     current_sample = samples["data"][samples["current_index"]]
     sound_file = current_sample['sound_path']
@@ -828,7 +812,6 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
     # Generate waveform plot using matplotlib and soundfile
     plt.figure(figsize=(12, 3))
     plt.plot(data)
-
     plt.tight_layout()
 
     # Convert the matplotlib figure to a PNG image
@@ -841,6 +824,7 @@ def update_plots(play_clicks, next_clicks, previous_clicks, previous_cluster_cli
 
     # Return the base64 encoded images as the src of the HTML image tags
     return f'data:image/png;base64,{mel_spectrogram_base64}', f'data:image/png;base64,{waveform_base64}'
+
 
 # @app.callback(
 #     Output('temporary-storage', 'children'),
@@ -915,10 +899,17 @@ def process_uploaded_files_and_update_dropdown(n_clicks, stored_file_paths_json)
 
     # Process each uploaded file
     for file_path in stored_file_paths:
+        # Ensure the file path is normalized
+        file_path = os.path.normpath(file_path)
+        print(f"Processing file: {file_path}")  # Debugging log
+
         audio = AudioSegment.from_file(file_path, format=file_path.rsplit('.', 1)[1].lower())
+        output_folder = os.path.dirname(file_path)  # Extract the correct directory
+        print(f"Output folder: {output_folder}")  # Debugging log
+
         feature_vectors, sound_paths = process_audio_chunk(
-            audio, os.path.dirname(file_path), file_path.rsplit('.', 1)[1].lower(), 
-            os.path.splitext(file_path)[0], duration=20
+            audio, output_folder, file_path.rsplit('.', 1)[1].lower(), 
+            os.path.splitext(os.path.basename(file_path))[0], duration=20
         )
 
         # Stack feature vectors and extend sound paths
@@ -939,13 +930,13 @@ def process_uploaded_files_and_update_dropdown(n_clicks, stored_file_paths_json)
     best_eps, best_min_samples, best_score, labels = calculate_silhouette_score(embedding)
 
     # Prepare a DataFrame with results
-    sound_paths_no_ext = [os.path.splitext(os.path.basename(path))[0] for path in combined_sound_paths]
+    #sound_paths_no_ext = [os.path.splitext(os.path.basename(path))[0] for path in combined_sound_paths]
     results_df = pd.DataFrame({
         'x': embedding[:, 0],
         'y': embedding[:, 1],
         'z': embedding[:, 2],
         'class': labels,
-        'sound_path': sound_paths_no_ext
+        'sound_path': combined_sound_paths
     })
 
     # Save processed data as a new CSV file
@@ -953,13 +944,14 @@ def process_uploaded_files_and_update_dropdown(n_clicks, stored_file_paths_json)
     results_df.to_csv(processed_csv_filename, index=False)
 
     # Update dropdown options with the new file
-    new_file_options = [{'label': file.split("/")[-1], 'value': file} for file in glob.glob("data/*.csv")]
-    
+    new_file_options = [{'label': os.path.basename(file), 'value': file} for file in glob.glob("data/*.csv")]
+
     # Clear stored file paths after processing
     stored_file_paths.clear()
 
     # Return updated options, set new file as the selected CSV, and path for debugging
     return new_file_options, processed_csv_filename, processed_csv_filename
+
 
 
 
@@ -1000,8 +992,39 @@ def process_uploaded_files_and_update_dropdown(n_clicks, stored_file_paths_json)
 
 # Functions
 def play_sound(sound_file):
-    pygame.mixer.music.load(sound_file)
-    pygame.mixer.music.play()
+    for subfolder in os.listdir(UPLOADS_DIRECTORY):
+        subfolder_path = os.path.join(UPLOADS_DIRECTORY, subfolder)
+        if os.path.isdir(subfolder_path):
+            full_path = os.path.join(subfolder_path, sound_file)
+            print(f"Checking path: {full_path}")  # Debug log
+            if os.path.exists(full_path):
+                pygame.mixer.music.load(full_path)
+                pygame.mixer.music.play()
+                return
+    raise FileNotFoundError(f"Sound file not found in any subdirectory: {sound_file}")
+
+# def play_sound(sound_file):
+#     # Define the expected audio file extensions
+#     valid_extensions = ['.wav', '.mp3', '.flac']  # Add any other formats supported by pygame
+
+#     # Iterate over subdirectories in the uploads directory
+#     for subfolder in os.listdir(UPLOADS_DIRECTORY):
+#         subfolder_path = os.path.join(UPLOADS_DIRECTORY, subfolder)
+
+#         # Ensure it's a directory
+#         if os.path.isdir(subfolder_path):
+#             for ext in valid_extensions:
+#                 # Add the extension to the sound file name
+#                 full_path = os.path.join(subfolder_path, sound_file + ext)
+
+#                 # Check if the file exists
+#                 if os.path.exists(full_path):
+#                     pygame.mixer.music.load(full_path)
+#                     pygame.mixer.music.play()
+#                     return  # Exit the function after playing
+
+#     # Raise an error if the file was not found with any valid extension
+#     raise FileNotFoundError(f"Sound file not found with any of the valid extensions: {sound_file}")
     
 def pause_sound():
     pygame.mixer.music.pause()
@@ -1045,6 +1068,13 @@ def get_features(y, sr):
     return feature_vector
 
 def process_audio_chunk(audio, output_folder, file_format, original_filename, duration):
+    # Normalize the output folder to prevent duplication
+    output_folder = os.path.normpath(output_folder)
+
+    # Ensure the output folder exists
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
     duration_seconds = duration * 60  # Convert duration from minutes to seconds
     chunk_length_ms = 4500  # Length of each audio chunk in milliseconds
     feature_vectors = []
@@ -1062,32 +1092,30 @@ def process_audio_chunk(audio, output_folder, file_format, original_filename, du
         end_time = start_time + chunk_length_ms
         chunk_data = audio[start_time:end_time]
 
-        chunk_file_name = f'{original_filename}_{chunk_index}.{file_format}'
-        chunk_file_path = chunk_file_name
-        
+        # Construct the file path
+        chunk_file_name = f"{original_filename}_{chunk_index}.{file_format}"
+        chunk_file_path = os.path.join(output_folder, chunk_file_name)
+        print(f"Saving chunk to: {chunk_file_path}")  # Debugging log
 
+        # Export the chunk
         chunk_data.export(chunk_file_path, format=file_format)
         total_time_ms += chunk_length_ms
+
+        # Append the correct file path
+        sound_paths.append(chunk_file_path)
 
         # Load chunk and extract features
         y, sr = librosa.load(chunk_file_path, sr=None)
         feat = get_features(y, sr)
         feature_vectors.append(feat)
-        sound_paths.append(chunk_file_path)
 
     # Normalize the feature vectors
     min_max_scaler = MinMaxScaler()
     x_scaled = min_max_scaler.fit_transform(feature_vectors)
     feature_vectors = pd.DataFrame(x_scaled)
-    
+
     # Take only the first 13 MFCCs
     feature_vectors = feature_vectors.iloc[:, :13]
-
-    # Save feature vectors to CSV
-    paths = pd.DataFrame(sound_paths)
-    df = pd.concat([feature_vectors, paths], ignore_index=True, sort=False, axis=1)
-    features_csv_path =  f'{original_filename}_features.csv'
-    df.to_csv(features_csv_path, index=False)
 
     return feature_vectors, sound_paths
 
