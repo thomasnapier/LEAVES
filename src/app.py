@@ -166,6 +166,10 @@ default_values = {
 }
 
 app.layout = html.Div([
+    dcc.Loading(
+        id="loading-indicator",
+        type="default",  # Or "circle", "dot", etc.
+        children=[html.Div([
     dcc.Store(id='config-store', data=default_values),
     html.Div([
         html.Img(src=f'data:image/png;base64,{encoded_logo}', id='logo'),
@@ -546,7 +550,14 @@ app.layout = html.Div([
     html.Div(id='csv-test'),
     html.Div(id='temporary-storage', style={'display': 'none'}),
     dcc.Store(id='processed-data-store')
-], id='main-container')
+], id='main-container'),
+html.Div(id="app-content"),
+        ],
+        fullscreen=False  # Keep this false to allow positioning
+    ),
+    dbc.Progress(id="progress-bar", value=0, striped=True, animated=True,
+                 style={"position": "fixed", "bottom": "0", "width": "100%"})
+])
 
 
 # Callbacks

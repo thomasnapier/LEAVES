@@ -411,3 +411,16 @@ input:checked + .slider:before {
 .option-component {
     margin-top: 10px;
 }
+
+.progress-value {
+    display: none;
+}
+
+#progress-bar {
+    position: fixed;
+    bottom: 0;
+    width: 0%;
+    height: 5px;
+    background-color: #007bff; /* Bootstrap primary color */
+    transition: width 0.3s ease;
+}

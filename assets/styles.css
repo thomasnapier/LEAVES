@@ -352,3 +352,46 @@ footer {
     background-color: var(--button-hover-background-color);
 }
 
+#sticky-toc {
+    position: fixed;
+    top: 120px;
+    right: 20px;
+    width: 200px;
+    padding: 15px;
+    background-color: var(--banner-background-color);
+    color: var(--banner-text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    z-index: 1000;
+}
+
+#sticky-toc ul {
+    list-style: none;
+    padding: 0;
+}
+
+#sticky-toc li {
+    margin-bottom: 10px;
+}
+
+#sticky-toc a {
+    text-decoration: none;
+    color: var(--button-text-color);
+}
+
+#sticky-toc a:hover {
+    color: var(--button-hover-background-color);
+}
+
+button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: var(--button-hover-background-color);
+}

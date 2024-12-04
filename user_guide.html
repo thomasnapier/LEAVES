@@ -1,62 +1,502 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="LEAVES User Guide for ecoacoustic data annotation and visualization.">
-    <meta name="keywords" content="LEAVES, ecoacoustics, user guide, soundscape analysis, annotation, visualization">
-    <meta name="author" content="Thomas J. Napier">
-    <title>LEAVES User Guide</title>
-    <link rel="stylesheet" href="assets/styles.css">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="LEAVES User Guide for ecoacoustic data annotation and visualization." name="description"/>
+<meta content="LEAVES, ecoacoustics, user guide, soundscape analysis, annotation, visualization" name="keywords"/>
+<meta content="Thomas J. Napier" name="author"/>
+<title>LEAVES User Guide</title>
+<link href="assets/styles.css" rel="stylesheet"/>
 </head>
 <body class="light">
-
 <!-- Top Banner with Logo and Navigation -->
 <div id="top-banner">
-    <img id="logo" src="./src/assets/logos/logo.png" alt="LEAVES Logo">
-    <div id="top-banner-title">LEAVES User Guide</div>
-    <nav id="navbar">
-        <a href="index.html">Home</a>
-    </nav>
-</div>
+<img alt="LEAVES Logo" id="logo" src="./src/assets/logos/logo.png"/>
+<div id="top-banner-title">LEAVES User Guide</div>
+<nav id="navbar">
+<a href="index.html">Home</a>
+</nav>
 
+</div>
+<!-- Sticky Table of Contents -->
+<div id="sticky-toc" style="
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    width: 200px;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    z-index: 1000;
+">
+    <h3>Table of Contents</h3>
+    <ul style="list-style-type: none; padding: 0;">
+        <li><a href="#download" style="text-decoration: none; color: #0073e6;">➤ Downloading the Application</a></li>
+        <li><a href="#file-upload-processing" style="text-decoration: none; color: #0073e6;">➤ File Uploading and Processing</a></li>
+        <li><a href="#annotation" style="text-decoration: none; color: #0073e6;">➤ Annotation</a></li>
+        <li><a href="#file-storage" style="text-decoration: none; color: #0073e6;">➤ File Storage and Selection</a></li>
+        <li><a href="#cluster-filtering" style="text-decoration: none; color: #0073e6;">➤ Cluster Filtering</a></li>
+        <li><a href="#saving-annotations" style="text-decoration: none; color: #0073e6;">➤ Saving Annotations</a></li>
+        <li><a href="#settings-configuration" style="text-decoration: none; color: #0073e6;">➤ Settings Configuration</a></li>
+        <li><a href="#cluster-switching" style="text-decoration: none; color: #0073e6;">➤ Cluster Annotation Switching</a></li>
+    </ul>
+</div>
 <!-- Main Container -->
 <div id="main-container">
-    <section id="collections" style="padding: 2rem;">
-        <h1>Collections</h1>
-        <h2>Recordings Upload</h2>
-        <p>Administrators can access the administration interface and upload recordings to specific collections by clicking the "upload" button. The date and time of a recording can be automatically extracted from the filename when in the format YYYMMDD_HHMMSS.</p>
-        <img src="images/recordings_admin.png" alt="Recordings administrative interface" width="80%">
-
-        <h2>General Organisation</h2>
-        <p>Recordings are organized in collections accessible from the top drop-down menu. In list view, recordings can be played back directly and some metadata are displayed.</p>
-        <img src="images/list_view.png" alt="Tag window" width="80%">
+    <div style="margin-left: 20%; margin-right: 20%;">
+        <section id="header" style="text-align: center; padding: 2rem;">
+            <h1>LEAVES: Large-scale Ecoacoustics Annotation and Visualization with Efficient Segmentation</h1>
+            <p>Streamline your ecoacoustic analysis with LEAVES, offering advanced tools for large-scale soundscape annotation and visualization. Join researchers and citizen scientists using LEAVES to analyze complex soundscapes faster and more accurately.</p>
+            <div style="margin-top: 1rem;">
+                <a href="https://github.com/thomasnapier/LEAVES/releases" class="cta-button">Download Now</a>
+                <a href="https://leaves-xuli.onrender.com/" class="cta-button" target="_blank">Try Demo</a>
+            </div>
+        </section>
+        </div>
+        <hr></hr>
+<section id="guide" style="padding: 2rem;">
+    <section id="download" style="padding: 2rem;">
+        <h1>➤ Downloading the LEAVES Application</h1>
+        <p>LEAVES is available for both technical users (Python-based installation) and general users (precompiled executable for Windows and macOS). Follow the steps below to get started:</p>
+        
+        <h2>Option 1: Precompiled Executable</h2>
+        <p>For ease of use, download the ready-to-use version of LEAVES:</p>
+        <ol>
+            <li>Visit the <a href="https://github.com/thomasnapier/LEAVES/releases" target="_blank">LEAVES Releases Page</a>.</li>
+            <li>Select the appropriate version for your operating system (Windows or macOS).</li>
+            <li>Extract the downloaded .zip file and double-click the executable to launch the application.</li>
+        </ol>
+    
+        <h2>Option 2: Python Installation</h2>
+        <p>If you prefer to use the Python version, follow these steps:</p>
+        <ol>
+            <li>Ensure Python 3.8 or later is installed on your machine.</li>
+            <li>Clone the LEAVES repository using the command:
+                <pre style="width: 30%;"><code>git clone https://github.com/thomasnapier/LEAVES.git</code></pre>
+            </li>
+            <li>Navigate to the LEAVES directory:
+                <pre style="width: 30%;"><code>cd LEAVES</code></pre>
+            </li>
+            <li>Install dependencies using pip:
+                <pre style="width: 30%;">pip install -r requirements.txt</code></pre>
+            </li>
+            <li>Run the application locally:
+                <pre style="width: 30%;">python app.py</code></pre>
+            </li>
+            <li>Open the URL provided in the terminal (e.g., <a href="http://127.0.0.1:8050" target="_blank">http://127.0.0.1:8050</a>) to access the tool.</li>
+        </ol>
     </section>
-
-    <section id="player" style="padding: 2rem;">
-        <h1>Player</h1>
-        <p>The spectrogram is the most prominent part of the player, visualizing sound in time, frequency, and amplitude.</p>
-        <img src="images/player.png" alt="Player interface" width="80%">
+    <hr></hr>
+    <section id="file-upload-processing" style="padding: 2rem;">
+        <h1>➤ File Uploading and Processing</h1>
+        <p>The first step in using LEAVES is uploading your audio files for analysis. Follow the instructions below to upload, process, and visualize your ecoacoustic data:</p>
+        
+        <h2>Supported File Formats</h2>
+        <p>LEAVES supports the following audio file formats:</p>
+        <ul>
+            <li><strong>WAV</strong> – Commonly used for high-quality recordings.</li>
+            <li><strong>MP3</strong> – Compressed format suitable for larger datasets.</li>
+            <li><strong>FLAC</strong> – High-quality lossless audio format.</li>
+        </ul>
+        
+        <h2>Steps to Upload and Process Data</h2>
+        <ol>
+            <li>
+                <strong>Access the Upload Module:</strong>
+                <p>Navigate to the top section of the interface where you will see the drag-and-drop area labelled "Drag and Drop or Select Files."</p>
+            </li>
+            <li>
+                <strong>Drag and Drop Files:</strong>
+                <p>Drag your audio files from your computer and drop them into the upload box. Alternatively, click the box to open a file browser and select your files manually.</p>
+            </li>
+            <li>
+                <strong>Start Processing:</strong>
+                <p>Click the "Process Uploaded Data" button to begin the analysis. The system will extract features, reduce complexity, and cluster the data in real-time according to your settings configuration.</p>
+            </li>
+            <li>
+                <strong>View the 3D Scatterplot:</strong>
+                <p>Once processing is complete, your data will be displayed in an interactive 3D scatterplot. Each point represents a segment of your audio data, grouped into clusters.</p>
+            </li>
+        </ol>
+    
+        <h2>Visualization in the 3D Scatterplot</h2>
+        <p>The scatterplot provides an interactive view of your data:</p>
+        <ul>
+            <li>Points are color-coded based on their clusters, which represent similar acoustic features.</li>
+            <li>Hover over points to see details about the audio sample (e.g., cluster number, coordinates).</li>
+            <li>Click on a point to listen to the corresponding audio and view its waveform and spectrogram.</li>
+        </ul>
+    
+        <h2>Troubleshooting Tips</h2>
+        <ul>
+            <li>If your file doesn't upload, ensure it is in one of the supported formats (WAV, MP3, or FLAC).</li>
+            <li>If the scatterplot doesn’t update, verify that you clicked the "Process Uploaded Data" button after uploading your files.</li>
+            <li>For large datasets, processing time may vary based on your computer's performance.</li>
+        </ul>
+        
+        <h2>Example</h2>
+        <p>See the GIF below for a demonstration of the file uploading and processing workflow:</p>
+        <img src="./src/assets/images/Upload.gif" alt="File Uploading and Processing" width="80%">
     </section>
+    <hr></hr>
+    <section id="annotation" style="padding: 2rem;">
+        <h1>➤ Annotation</h1>
+        <p>The annotation process in LEAVES allows users to assign meaningful labels to audio samples, facilitating the creation of high-quality labeled datasets. This process integrates audio playback, waveform and spectrogram visualization, and cluster-level interaction for efficient annotation.</p>
+    
+        <h2>Steps for Annotation</h2>
+        <ol>
+            <li>
+                <strong>Select a Cluster or Point:</strong>
+                <p>Navigate the 3D scatterplot to locate clusters or individual points that need annotation. Use zoom and pan controls to focus on specific areas.</p>
+                <p><em>Tip:</em> Clusters are color-coded to represent groups of similar acoustic features.</p>
+            </li>
+            <li>
+                <strong>Click on a Point:</strong>
+                <p>Click on a point in the scatterplot to reveal its audio sample. This action displays the following details:</p>
+                <ul>
+                    <li>A waveform visualization of the sample.</li>
+                    <li>A real-time spectrogram showing frequency, time, and amplitude.</li>
+                    <li>Playback controls to listen to the audio.</li>
+                </ul>
+            </li>
 
-    <section id="tags" style="padding: 2rem;">
-        <h1>Tags (Annotations)</h1>
-        <p>Tags appear as boxes overlaid on the spectrogram. Users can edit, zoom, and estimate call distances for these tags.</p>
-        <img src="images/tag_window.png" alt="Tag window" width="80%">
+            <li>
+                <strong>Label the Sample:</strong>
+                <p>Below the visualization, select one or more labels from the checklist to annotate the sample. The checklist includes predefined classes (e.g., "Bird", "Insect", "Rain") or custom labels based on your study.</p>
+            </li>
+            <li>
+                <strong>Propagate Labels (Optional):</strong>
+                <p>After labeling a subset of points in a cluster, you can propagate the most common label across the remaining points in the cluster automatically. This feature saves time while maintaining accuracy.</p>
+                <p><em>Note:</em> In case of a tie between labels, a tie-breaker algorithm will suggest the appropriate label based on hierarchical relationships.</p>
+            </li>
+            <li>
+                <strong>Navigate Between Clusters:</strong>
+                <p>Use the navigation controls to move between clusters and repeat the annotation process for other groups of samples.</p>
+            </li>
+        </ol>
+    
+        <h2>Keyboard Shortcuts</h2>
+        <p>To streamline the annotation process, use the following shortcuts:</p>
+        <ul>
+            <li><strong>Spacebar:</strong> Play/pause the audio sample.</li>
+            <li><strong>Arrow Keys:</strong> Navigate between points in the scatterplot.</li>
+            <li><strong>Enter:</strong> Confirm a label selection.</li>
+        </ul>
+    
+        <h2>Troubleshooting Tips</h2>
+        <ul>
+            <li><strong>Audio not playing:</strong> Ensure your system volume is turned up and your browser supports audio playback.</li>
+            <li><strong>Labels not saving:</strong> Check if you clicked "Save Annotations" after labeling. This button ensures your labels are recorded in the dataset.</li>
+            <li><strong>Unclear spectrogram:</strong> Adjust preprocessing settings in the configuration modal for improved signal clarity.</li>
+        </ul>
+    
+        <h2>Example</h2>
+        <p>See the GIF below for a demonstration of the annotation process:</p>
+        <img src="./src/assets/images/Annotation.gif" alt="Annotation Process" width="80%">
     </section>
-
-    <section id="admin" style="padding: 2rem;">
-        <h1>Administration</h1>
-        <h2>Users</h2>
-        <p>Administrators can create users, set privileges, and manage user access to specific collections.</p>
-        <img src="images/users_admin.png" alt="Users administrative interface" width="80%">
+    <hr></hr>
+    <section id="file-storage" style="padding: 2rem;">
+        <h1>➤ File Storage and Selection</h1>
+        <p>LEAVES handles file storage efficiently to keep your uploaded and processed data organized. This section explains where files are stored, how to access them, and how to select between datasets within the application.</p>
+    
+        <h2>File Storage Location</h2>
+        <p>When you upload audio files to LEAVES, they are stored locally in a designated folder on your system. By default:</p>
+        <ul>
+            <li>The uploaded files are saved in the <code>uploads</code> directory within the application's folder.</li>
+            <li>Processed datasets and temporary files are managed automatically to ensure efficient performance.</li>
+        </ul>
+        <p><em>Note:</em> The storage path may vary if you are using a precompiled executable versus the Python version. Refer to the documentation for your specific installation.</p>
+    
+        <h2>Dataset Selection</h2>
+        <p>If you upload multiple datasets, LEAVES provides a drop-down menu for easy switching between them. This feature is particularly useful for managing and annotating large-scale ecoacoustic data.</p>
+        <ol>
+            <li>
+                <strong>Locate the Dataset Dropdown:</strong>
+                <p>The dataset selection dropdown is located above the 3D scatterplot interface. It displays the names of all currently uploaded datasets.</p>
+            </li>
+            <li>
+                <strong>Select a Dataset:</strong>
+                <p>Click the dropdown and choose the desired dataset from the list. The scatterplot and other visualization elements will update automatically to reflect the selected dataset.</p>
+            </li>
+            <li>
+                <strong>Manage Uploaded Files:</strong>
+                <p>Uploaded files remain available within the application until they are manually removed. You can delete files directly from the local storage folder if needed.</p>
+            </li>
+        </ol>
+    
+        <h2>Troubleshooting Tips</h2>
+        <ul>
+            <li><strong>Cannot locate uploaded files:</strong> Verify that the files are stored in the <code>uploads</code> directory. If you are using a custom directory, check your configuration settings.</li>
+            <li><strong>Dataset not appearing in the dropdown:</strong> Ensure that the file upload and processing steps were completed successfully. Only processed datasets will appear in the list.</li>
+            <li><strong>Accidentally deleted a dataset:</strong> Re-upload the files and process them again to restore the dataset.</li>
+        </ul>
+    
+        <h2>Example</h2>
+        <p>See the GIF below for a demonstration of selecting and managing datasets:</p>
+        <img src="./src/assets/images/File Storage.gif" alt="File Storage and Selection" width="80%">
     </section>
+    <hr></hr>
+    <section id="cluster-filtering" style="padding: 2rem;">
+        <h1>➤ Cluster Filtering and Point-Click Interaction</h1>
+        <p>LEAVES provides tools for filtering clusters and interacting with individual data points in the 3D scatterplot. This functionality allows users to focus on specific subsets of data and inspect them in detail.</p>
+    
+        <h2>Steps for Cluster Filtering</h2>
+        <ol>
+            <li>
+                <strong>Access the Filtering Options:</strong>
+                <p>Located near the scatterplot, the filtering panel includes controls to adjust which clusters are displayed based on criteria such as cluster size, density, or specific labels.</p>
+            </li>
+            <li>
+                <strong>Filter by Cluster Properties:</strong>
+                <p>Use the sliders and checkboxes in the filtering panel to apply the desired filters. For example:</p>
+                <ul>
+                    <li><em>Minimum Cluster Size:</em> Hide smaller clusters by setting a threshold.</li>
+                    <li><em>Specific Labels:</em> Focus on clusters containing specific labels.</li>
+                    <li><em>Noise Filtering:</em> Exclude points identified as noise by the clustering algorithm.</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Apply the Filters:</strong>
+                <p>The scatterplot updates dynamically as filters are adjusted, allowing you to see only the data of interest.</p>
+            </li>
+        </ol>
+    
+        <h2>Point-Click Interaction</h2>
+        <p>Once the desired clusters are visible, you can interact with individual points to inspect them further:</p>
+        <ol>
+            <li>
+                <strong>Select a Point:</strong>
+                <p>Click on any point in the scatterplot to display detailed information about the audio segment it represents.</p>
+            </li>
+            <li>
+                <strong>Audio Playback:</strong>
+                <p>Play the audio sample associated with the point using the playback controls.</p>
+            </li>
+            <li>
+                <strong>Visualization:</strong>
+                <p>View the waveform and spectrogram of the selected audio sample for a deeper analysis of its acoustic properties.</p>
+            </li>
+            <li>
+                <strong>Annotate the Point:</strong>
+                <p>Assign labels to the point if needed. This annotation is saved along with the dataset.</p>
+            </li>
+        </ol>
+    
+        <h2>Troubleshooting Tips</h2>
+        <ul>
+            <li><strong>Filters not working:</strong> Ensure the clustering algorithm has completed processing and generated valid clusters.</li>
+            <li><strong>Points not clickable:</strong> Check if the scatterplot is fully loaded and zoom in for better precision in dense clusters.</li>
+            <li><strong>Audio not playing:</strong> Verify your browsers audio settings and ensure the file is correctly linked in the dataset.</li>
+        </ul>
+    
+        <h2>Example</h2>
+        <p>See the GIF below for a demonstration of cluster filtering and point-click interaction:</p>
+        <img src="./src/assets/images/Filtering.gif" alt="Cluster Filtering and Interaction" width="80%">
+    </section>    
+    <hr></hr>
+    <section id="saving-annotations" style="padding: 2rem;">
+        <h1>➤ Saving Annotations</h1>
+        <p>Once you have labeled your clusters and individual points, you can save your annotations to ensure your work is preserved and ready for further analysis. This section explains how to save, manage, and export your annotated datasets.</p>
+    
+        <h2>Steps for Saving Annotations</h2>
+        <ol>
+            <li>
+                <strong>Complete Your Annotations:</strong>
+                <p>Ensure all desired clusters and points are labeled. Review your annotations by revisiting clusters and checking labels in the annotation panel.</p>
+            </li>
+            <li>
+                <strong>Click the "Save Annotations" Button:</strong>
+                <p>Once you are satisfied with your labels, click the "Save Annotations" button located in the control panel. This action saves your annotations to a CSV file.</p>
+            </li>
+            <li>
+                <strong>Download the CSV File:</strong>
+                <p>The saved file will include metadata such as cluster coordinates, audio file paths, and the assigned labels. Use the "Download Annotations" button to export the file to your system.</p>
+            </li>
+        </ol>
+    
+        <h2>File Format</h2>
+        <p>The exported annotations are stored in a CSV file with the following structure:</p>
+        <ul>
+            <li><code>Cluster_ID:</code> The ID of the cluster the point belongs to.</li>
+            <li><code>Point_Coordinates:</code> The coordinates of the point in the scatterplot.</li>
+            <li><code>Audio_File_Path:</code> The file path of the associated audio sample.</li>
+            <li><code>Labels:</code> The labels assigned to the point or cluster.</li>
+        </ul>
+        <p>This format is compatible with most data analysis tools and can be easily re-imported into LEAVES for further processing.</p>
+    
+        <h2>Troubleshooting Tips</h2>
+        <ul>
+            <li><strong>Annotations not saving:</strong> Ensure you clicked the "Save Annotations" button after completing your labels.</li>
+            <li><strong>CSV file not downloading:</strong> Check your browser’s download permissions and ensure pop-ups are allowed for the application.</li>
+            <li><strong>Annotations missing after re-import:</strong> Verify that the CSV file was correctly saved and includes all required fields.</li>
+        </ul>
+    
+        <h2>Example</h2>
+        <p>See the GIF below for a demonstration of saving and downloading annotations:</p>
+        <img src="./src/assets/images/Saving.gif" alt="Saving Annotations" width="80%">
+    </section>
+    <hr></hr>
+    <section id="settings-configuration" style="padding: 2rem;">
+        <h1>➤ Settings Configuration</h1>
+        <p>The LEAVES application offers a robust settings modal that enables users to customize the analysis pipeline, from preprocessing to clustering. Each setting is designed to fine-tune the workflow and optimize performance for specific datasets.</p>
+    
+        <h2>Accessing the Settings</h2>
+        <ol>
+            <li>
+                <strong>Open the Configuration Panel:</strong>
+                <p>Click the ⚙️ icon in the top-right corner of the application to open the settings modal.</p>
+            </li>
+            <li>
+                <strong>Adjust the Parameters:</strong>
+                <p>Use the sliders, dropdowns, and toggle buttons to modify settings in the following categories:</p>
+            </li>
+        </ol>
+    
+        <h2>Settings Overview</h2>
+    
+        <h3>1. Preprocessing</h3>
+        <ul>
+            <li><strong>Systematic Data Sampling:</strong> Enable this toggle to sample a percentage of the dataset for processing, reducing computational load. Default: Enabled.</li>
+            <li><strong>Short-Term Windowing:</strong> Splits audio files into smaller segments (e.g., 4.5 seconds) for detailed analysis. Default: Enabled.</li>
+            <li><strong>Windowing Input:</strong> Adjust the segment duration using a slider or input field. Range: 1–10 seconds. Default: 4.5 seconds.</li>
+            <li><strong>Data Sampling:</strong> Specify the maximum duration of audio to process in minutes. Range: 0–40 minutes. Default: 20 minutes.</li>
+            <li><strong>Denoising Method:</strong> Choose from various denoising techniques:
+                <ul>
+                    <li><em>None:</em> No noise reduction applied (default).</li>
+                    <li><em>Wavelet-based:</em> Applies wavelet filtering for noise suppression.</li>
+                    <li><em>Low-pass:</em> Retains lower frequencies while filtering out higher ones.</li>
+                    <li><em>High-pass:</em> Retains higher frequencies while filtering out lower ones.</li>
+                    <li><em>Band-pass:</em> Retains frequencies within a specified range.</li>
+                </ul>
+            </li>
+        </ul>
+    
+        <h3>2. Feature Extraction</h3>
+        <ul>
+            <li><strong>Min-Max Normalization:</strong> Scales features between 0 and 1 for consistency across datasets. Default: Enabled.</li>
+            <li><strong>Include MFCC Derivatives:</strong> Adds first and second-order derivatives of MFCC features, capturing temporal dynamics. Default: Disabled.</li>
+        </ul>
+    
+        <h3>3. Complexity Reduction</h3>
+        <ul>
+            <li><strong>Reduction Method:</strong> Select a dimensionality reduction technique:
+                <ul>
+                    <li><em>UMAP:</em> Optimized for high-dimensional data visualization (default).</li>
+                    <li><em>t-SNE:</em> Captures local and global structures in the data.</li>
+                    <li><em>PCA:</em> Projects data onto principal components for simpler representation.</li>
+                </ul>
+            </li>
+            <li><strong>UMAP Settings:</strong>
+                <ul>
+                    <li><em>N Neighbors:</em> Determines the number of neighboring points considered. Range: 5–50. Default: 15.</li>
+                    <li><em>Min Distance:</em> Controls the spacing of points in the low-dimensional space. Range: 0.0–1.0. Default: 0.1.</li>
+                </ul>
+            </li>
+            <li><strong>t-SNE Settings:</strong>
+                <ul>
+                    <li><em>Perplexity:</em> Adjusts the balance between local and global structure. Range: 5–50. Default: 30.</li>
+                    <li><em>Learning Rate:</em> Controls the speed of convergence. Range: 10–1000. Default: 200.</li>
+                </ul>
+            </li>
+            <li><strong>PCA Settings:</strong>
+                <ul>
+                    <li><em>Number of Components:</em> Sets the number of principal components to retain. Range: 1–100. Default: 2.</li>
+                </ul>
+            </li>
+        </ul>
+    
+        <h3>4. Clustering</h3>
+        <ul>
+            <li><strong>Clustering Algorithm:</strong> Choose a clustering method:
+                <ul>
+                    <li><em>DBSCAN:</em> Density-based clustering with adjustable <em>Eps</em> and <em>Min Samples</em> (default).</li>
+                    <li><em>k-means:</em> Groups data into a specified number of clusters.</li>
+                    <li><em>Agglomerative:</em> Hierarchical clustering based on a distance metric.</li>
+                </ul>
+            </li>
+            <li><strong>DBSCAN Settings:</strong>
+                <ul>
+                    <li><em>Eps:</em> Maximum distance between points in the same cluster. Range: 0.0–5.0. Default: 0.5.</li>
+                    <li><em>Min Samples:</em> Minimum points required to form a cluster. Range: 1–100. Default: 5.</li>
+                </ul>
+            </li>
+            <li><strong>k-means Settings:</strong>
+                <ul>
+                    <li><em>Number of Clusters (k):</em> Sets the number of clusters to form. Range: 1–100. Default: 3.</li>
+                </ul>
+            </li>
+            <li><strong>Agglomerative Settings:</strong>
+                <ul>
+                    <li><em>Linkage Type:</em> Determines how clusters are merged (e.g., Ward, Complete, Average, Single). Default: Ward.</li>
+                    <li><em>Distance Threshold:</em> Sets the maximum distance for merging clusters. Range: 0–100. Default: 10.</li>
+                </ul>
+            </li>
+        </ul>
+    
+        <h2>Applying Changes</h2>
+        <ol>
+            <li><strong>Modify Settings:</strong> Adjust parameters as needed using the modal controls.</li>
+            <li><strong>Save Settings:</strong> Click the <strong>Done</strong> button to apply the changes. The scatterplot and analysis pipeline will refresh automatically.</li>
+        </ol>
+    
+        <h2>Example</h2>
+        <p>See the GIF below for a demonstration of configuring settings:</p>
+        <img src="./src/assets/images/Settings.gif" alt="Settings Configuration" width="80%">
+    </section>    
+    <hr></hr>
+    <section id="cluster-switching" style="padding: 2rem;">
+        <h1>➤ Cluster Annotation Switching</h1>
+        <p>LEAVES provides tools to quickly modify annotations at the cluster level, ensuring efficient relabeling or updating of cluster-wide labels. This functionality is designed to save time while maintaining flexibility in the annotation process.</p>
+    
+        <h2>Steps for Cluster Annotation Switching</h2>
+        <ol>
+            <li>
+                <strong>Select a Cluster:</strong>
+                <p>Identify the cluster you want to modify by locating it on the 3D scatterplot. Clusters are color-coded and can be filtered for easier navigation using the filtering panel.</p>
+            </li>
+            <li>
+                <strong>Open the Annotation Panel:</strong>
+                <p>Click on the cluster or a point within the cluster to bring up the annotation panel. This panel displays the current label(s) applied to the cluster or point.</p>
+            </li>
+            <li>
+                <strong>Edit the Labels:</strong>
+                <p>Update the cluster annotation by:</p>
+                <ul>
+                    <li><strong>Adding a New Label:</strong> Use the label selection interface to add additional labels that describe the cluster's content.</li>
+                    <li><strong>Removing an Existing Label:</strong> Uncheck the labels you want to remove from the cluster.</li>
+                    <li><strong>Replacing a Label:</strong> Uncheck the old label and select the new label(s).</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Propagate the New Label:</strong>
+                <p>Once updated, the new label is propagated across all points in the cluster. Any annotations at the point level can be overridden or retained based on your selection.</p>
+            </li>
+            <li>
+                <strong>Review the Changes:</strong>
+                <p>Revisit the cluster on the scatterplot to ensure the new labels have been applied as intended. Labels will appear in the annotation panel and the associated metadata.</p>
+            </li>
+        </ol>
+    
+        <h2>Example</h2>
+        <p>See the GIF below for a demonstration of switching cluster annotations:</p>
+        <img src="./src/assets/images/Switching.gif" alt="Cluster Annotation Switching" width="80%">
+    </section>    
+    <hr></hr>
+</section>
 </div>
-
 <!-- Footer -->
-<footer style="text-align: center; padding: 1rem; background-color: var(--banner-background-color); color: var(--banner-text-color);">
-    <p>LEAVES @ Thomas J. Napier, All rights reserved.</p>
+<footer style="background-color: var(--banner-background-color); color: var(--banner-text-color); text-align: center; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; box-sizing: border-box;">
+<div class="footer-icons">
+<a href="https://github.com/thomasnapier/LEAVES"><img alt="GitHub" src="./src/assets/icons/github-icon.png" width="24"/></a>
+<a href="https://scholar.google.com.au/citations?user=0iFYOXoAAAAJ&amp;hl=en"><img alt="Google Scholar" src="./src/assets/icons/scholar-icon.png" width="24"/></a>
+<a href="mailto:thomas.napier@jcu.edu.au"><img alt="Email" src="./src/assets/icons/email-icon.png" width="24"/></a>
+</div>
+<div style="margin-left: auto;">
+<p>LEAVES @ Thomas J. Napier, All rights reserved.</p>
+</div>
 </footer>
-
 </body>
 </html>
