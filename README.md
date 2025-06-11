@@ -17,8 +17,8 @@ LEAVES is a powerful ecoacoustics tool designed to streamline the annotation and
 ---
 
 ## ➤ Key Features
-- **Efficient Labeling:** Reduces annotation time for large datasets with cluster-based workflows.
-- **Interactive Visualizations:** Explore your data in 3D scatterplots, spectrograms, and waveforms.
+- **Efficient Labelling:** Reduces annotation time for large datasets with cluster-based workflows.
+- **Interactive Visualisations:** Explore your data in 3D scatterplots, spectrograms, and waveforms.
 - **Customizable Configuration:** Flexible settings for preprocessing, clustering, and visualization.
 - **Multi-Format Support:** Works with `.WAV`, `.MP3`, `.FLAC`, and more.
 - **Real-Time Spectrograms:** Analyze acoustic features while annotating.
@@ -75,14 +75,13 @@ Process, annotate, and save your data using LEAVES' advanced clustering and anno
 3. **Dimensionality Reduction:** Techniques like **UMAP** and **t-SNE** reduce data complexity for intuitive visualization.
 4. **Clustering:** Algorithms like **DBSCAN** and **k-means** group similar sounds for efficient labeling.
 5. **Annotation:** Assign labels to clusters or individual points, with propagation features to save time.
-6. **Visualization:** Interactive tools like waveforms, spectrograms, and 3D scatterplots aid exploration and analysis.
+6. **Visualisation:** Interactive tools like waveforms, spectrograms, and 3D scatterplots aid exploration and analysis.
 
 ---
 
 ## ➤ Notes
 - **Technologies Used:** Python 3, Dash, Plotly, Librosa, Scikit-Learn.
 - **Current Status:** Alpha Version.
-- **Demo Instance:** [Try the Demo](https://leaves-xuli.onrender.com/)
 - **Documentation:** [User Guide](https://thomasnapier.github.io/LEAVES/user_guide.html)
 
 ---
@@ -90,12 +89,24 @@ Process, annotate, and save your data using LEAVES' advanced clustering and anno
 ## ➤ Useful Links
 - [Project Site](https://thomasnapier.github.io/LEAVES/): Comprehensive guide and instructions for LEAVES features.
 - [Installation Guide](https://thomasnapier.github.io/LEAVES/user_guide.html#download): Detailed instructions for setup.
-- [Demo Instance](https://leaves-xuli.onrender.com/): Explore a hosted version of LEAVES.
-
+- [Video Demonstration](https://www.youtube.com/watch?v=CGRJcYRNl58&ab_channel=K.LisaYangCenterforConservationBioacoustics): Talk and live demonstration.
+- [Paper](https://www.sciencedirect.com/science/article/pii/S1574954125000354): Paper on the methodology and experimental results. 
 ---
 
-## ➤ License
-LEAVES is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+## ➤ Citations
+If you use LEAVES in your work, please cite it as:
+```
+@article{napier2025leaves,
+    title={LEAVES: An open-source web-based tool for the scalable annotation and visualisation of large-scale ecoacoustic datasets using cluster analysis},
+    author={Napier, Thomas and Ahn, Euijoon and Allen-Ankins, Slade and Schwarzkopf, Lin and Lee, Ickjai},
+    journal={Ecological Informatics},
+    volume={87},
+    pages={103026},
+    year={2025},
+    publisher={Elsevier},
+    doi={https://doi.org/10.1016/j.ecoinf.2025.103026}
+}						
+```
 
 ---
 
