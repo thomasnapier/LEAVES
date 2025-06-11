@@ -8,7 +8,7 @@ samples derived from the Australian Acoustic Observatory (A2O)
 """
 
 #Imports
-from re import T
+import re
 #from tkinter.tix import Tree
 import click
 import pandas as pd
@@ -23,6 +23,7 @@ import plotly
 import pygame
 import random
 import json
+import flask
 from itertools import cycle
 import base64
 from io import BytesIO
@@ -61,7 +62,7 @@ def get_base_path():
     
 BASE_DIR = get_base_path()
 UPLOADS_DIRECTORY = os.path.join(BASE_DIR, "uploads")
-DATA_DIRECTORY = os.path.join(BASE_DIR, "data")
+DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "data")
 ASSETS_DIRECTORY = os.path.join(BASE_DIR, "assets")
 LOGOS_DIRECTORY = os.path.join(ASSETS_DIRECTORY, "logos")
 
@@ -69,23 +70,25 @@ LOGOS_DIRECTORY = os.path.join(ASSETS_DIRECTORY, "logos")
 pygame.mixer.init()
 
 # Load data
-df = pd.read_csv(os.path.join(DATA_DIRECTORY, 'Undara-DryB.csv'))
+df = None
 label_options = ["Background Silence", "Birds", "Frogs", "Human Speech", "Insects", "Mammals",
                  "Misc/Uncertain", "Rain (Heavy)", "Rain (Light)", "Vehicles (Aircraft/Cars)",
                  "Wind (Strong)", "Wind (Light)"]
-file_options = [{'label': os.path.basename(file), 'value': file} for file in glob.glob(os.path.join(DATA_DIRECTORY, "*.csv"))]
+file_options = []
 current_cluster_index = 0
-current_csv_file = os.path.join(DATA_DIRECTORY, 'Undara-DryB.csv')
+current_csv_file = None
 sampled_point_index = 0
 samples_json = None
 uploaded_files = []
+uploaded_filenames = []
 
 # Temporary folder for server-side storage
 TEMP_FOLDER = tempfile.mkdtemp()
 
-for label_option in label_options:
-    if label_option.lower().replace(' ', '_') not in df.columns:
-        df[label_option.lower().replace(' ', '_')] = 0
+if df is not None:
+    for label_option in label_options:
+        if label_option.lower().replace(' ', '_') not in df.columns:
+            df[label_option.lower().replace(' ', '_')] = 0
 
 # Initialize the DataFrame
 columns = ['embedding_x', 'embedding_y', 'embedding_z', 'sound_path']
@@ -97,18 +100,34 @@ def save_annotations_to_csv(df, filepath):
     df.to_csv(filepath, index=False)
 
 def create_figure(df, current_cluster_index):
+    if 'propagated_class' not in df.columns:
+        df['propagated_class'] = ""
+
     classes = df['class'].unique()
     colors = plt.cm.get_cmap('tab10', len(classes))
     fig = go.Figure()
-    for i, c in enumerate(classes):
+    for c in classes:
         dfi = df[df['class'] == c]
-        marker_size = 10 if i == current_cluster_index else 5  # Highlight current cluster
-        fig.add_trace(go.Scatter3d(x=dfi['x'], y=dfi['y'], z=dfi['z'],
-                                mode='markers',
-                                name="Cluster " + str(c),
-                                customdata=dfi['sound_path'],
-                                marker=dict(size=marker_size, line=dict(width=0.1, color='black')),
-                                marker_color=[f'rgba{colors(i)}' for _ in range(len(dfi))]))
+        marker_size = 10 if c == df['class'].unique()[current_cluster_index] else 5
+
+        # ✅ Use the majority propagated_class value
+        cluster_label = f"Cluster {c}"
+        if not dfi['propagated_class'].isnull().all() and dfi['propagated_class'].str.strip().any():
+            majority_label = dfi['propagated_class'].mode().iloc[0]
+            if isinstance(majority_label, str) and majority_label.strip():
+                cluster_label = f"Cluster {c}: {majority_label}"
+
+        fig.add_trace(go.Scatter3d(
+            x=dfi['x'], y=dfi['y'], z=dfi['z'],
+            mode='markers',
+            name=cluster_label,
+            customdata=dfi['sound_path'],
+            marker=dict(
+                size=marker_size,
+                line=dict(width=0.1, color='black')
+            ),
+            marker_color=[f'rgba{colors(classes.tolist().index(c))}' for _ in range(len(dfi))]
+        ))
         
     fig.update_layout(
         paper_bgcolor="var(--background-color)",
@@ -132,7 +151,7 @@ def create_figure(df, current_cluster_index):
 
 
 # Define app and layout
-fig = create_figure(df, current_cluster_index)
+fig = create_figure(df, current_cluster_index) if df is not None else go.Figure()
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 
@@ -166,6 +185,10 @@ default_values = {
 }
 
 app.layout = html.Div([
+    dcc.Store(id='trigger-processing', data=False),
+    dcc.Store(id='refresh-scatter', data=0),
+    dcc.Store(id='settings-complete', data=False),
+    dcc.Store(id='trigger-process-after-settings', data=0),
     dcc.Loading(
         id="loading-indicator",
         type="default",  # Or "circle", "dot", etc.
@@ -175,8 +198,8 @@ app.layout = html.Div([
         html.Img(src=f'data:image/png;base64,{encoded_logo}', id='logo'),
         html.Span('LEAVES', id='top-banner-title')
     ], id='top-banner'),
-    html.Button('⚙️', id='open-settings', style={'position': 'absolute', 'top': '10px', 'right': '10px'}),
-    html.Button('🌙/☀️', id='theme-toggle', style={'position': 'absolute', 'top': '10px', 'right': '150px'}),
+    html.Button('⚙️', id='open-settings', style={'position': 'absolute', 'top': '10px', 'right': '10px', 'display': 'none'}),
+    html.Button('🌙/☀️', id='theme-toggle', style={'position': 'absolute', 'top': '10px', 'right': '150px', 'display': 'none'}),
     html.Div([
         html.Div([
             html.H2("Software Configuration", style={'textAlign': 'center', 'color': 'var(--text-color)'}),
@@ -513,7 +536,7 @@ app.layout = html.Div([
         ),
         html.Div(id='upload-status', style={'color': 'var(--text-color)', 'display': 'none'}),
             html.Button('Process Uploaded Data', id='process-data-button', style={'margin-top': '10px', 'margin-bottom': '10px'}),
-            dcc.Dropdown(id='file-dropdown', options=file_options, value=file_options[0]['value'], style={'color': 'black'}),
+            dcc.Dropdown(id='file-dropdown', options=[], value=None, style={'color': 'black'}),
             html.Div(dcc.Graph(id='scatter-plot', figure=fig, style={'height': '100%', 'width': '100%'}), id='scatterplot-container'),
             html.Div([
                 html.Div(id='checklist-title', children='Classes:'),
@@ -526,8 +549,8 @@ app.layout = html.Div([
                 ], id='annotation-tags-container')
             ], id='checklist-container'),
             html.Div([
-                html.Button('Save Annotations', id='control-button'),
-                html.A('Download CSV', id='csv-download-link', href='', download='annotations.csv')
+                html.Button("Download CSV", id="csv-download-btn"),
+                dcc.Download(id="csv-download"),
             ]),
         ], id='left-column'),
         html.Div([
@@ -562,25 +585,49 @@ html.Div(id="app-content"),
 
 # Callbacks
 @app.callback(
-    Output('settings-modal', 'style'),
-    [Input('open-settings', 'n_clicks'), Input('close-settings', 'n_clicks')],
-    [State('settings-modal', 'style')]
+    [Output('settings-modal', 'style'),
+     Output('settings-complete', 'data'),
+     Output('refresh-scatter', 'data'),
+     Output('trigger-processing', 'data')],
+    [Input('open-settings', 'n_clicks'),
+     Input('close-settings', 'n_clicks'),
+     Input('process-data-button', 'n_clicks'),
+     Input('upload-status', 'children')],
+    [State('settings-modal', 'style'),
+     State('settings-complete', 'data'),
+     State('refresh-scatter', 'data'),
+     State('trigger-processing', 'data')],
+    prevent_initial_call=True
 )
-def toggle_modal(open_clicks, close_clicks, style):
+def handle_settings_modal(open_clicks, close_clicks, process_clicks, upload_json,
+                          current_style, settings_complete, refresh_counter, trigger_flag):
     ctx = dash.callback_context
-
     if not ctx.triggered:
         raise PreventUpdate
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    if button_id == 'open-settings' and open_clicks:
-        return {'display': 'block', 'position': 'fixed', 'z-index': '1000', 'left': '25%', 'top': '10%', 'width': '50%', 'background-color': 'var(--background-color)', 'border': '2px solid var(--border-color)', 'border-radius': '5px', 'color': 'var(--text-color)', 'max-height': '80vh'}
+    def show_modal():
+        return {'display': 'block', 'position': 'fixed', 'z-index': '1000',
+                'left': '25%', 'top': '10%', 'width': '50%',
+                'background-color': 'var(--background-color)',
+                'border': '2px solid var(--border-color)',
+                'border-radius': '5px', 'color': 'var(--text-color)',
+                'max-height': '80vh'}
 
-    elif button_id == 'close-settings' and close_clicks:
-        return {'display': 'none'}
+    if button_id == 'upload-status':
+        return current_style, False, refresh_counter, False
 
-    return style
+    if button_id == 'open-settings':
+        return show_modal(), settings_complete, refresh_counter, trigger_flag
+
+    if button_id == 'process-data-button' and not settings_complete:
+        return show_modal(), settings_complete, refresh_counter, False
+
+    if button_id == 'close-settings':
+        return {'display': 'none'}, True, refresh_counter + 1, True  # ← trigger processing
+
+    return current_style, settings_complete, refresh_counter, trigger_flag
 
 # Callback for toggling active button in button group
 @app.callback(
@@ -849,72 +896,160 @@ def handle_settings(windowing_slider, windowing_input,
 
 @app.callback(
     Output('class-labels-checklist', 'value'),
-    [Input('play-audio', 'n_clicks'),
-     Input('next-point', 'n_clicks'),
-     Input('previous-point', 'n_clicks')],
-    [State('hidden-sample-data', 'children')])
-def update_checklist(play_clicks, next_clicks, prev_clicks, samples_json):
+    Input('hidden-sample-data', 'children')
+)
+def update_checklist(samples_json):
     if samples_json is None:
         return []
-    
+
     samples = json.loads(samples_json)
     current_sample = samples["data"][samples["current_index"]]
     sound_file = current_sample['sound_path']
-    
-    # Extract the row corresponding to the current sound file
-    row = df[df['sound_path'] == sound_file].iloc[0]
-    
-    # Determine which checkboxes should be checked based on the DataFrame
-    checked_boxes = [col for col in label_options if row[col.lower().replace(' ', '_')] == 1]
+
+    row = df[df['sound_path'] == sound_file]
+    if row.empty:
+        return []
+
+    row = row.iloc[0]
+    checked_boxes = [label for label in label_options if row.get(label.lower().replace(' ', '_'), 0) == 1]
     return checked_boxes
 
-@app.callback(
-    Output('csv-dummy-output', 'children'),
-    [Input('control-button', 'n_clicks')],
-    [State('class-labels-checklist', 'value'),
-     State('hidden-sample-data', 'children')]
-)
-def update_annotations(n_clicks, selected_labels, samples_json):
-    if n_clicks is None:
-        raise PreventUpdate
-
-    if samples_json is None:
-        return dash.no_update
+# @app.callback(
+#     Output('refresh-scatter', 'data'),
+#     [Input('control-button', 'n_clicks')],
+#     [State('class-labels-checklist', 'value'),
+#      State('hidden-sample-data', 'children'),
+#      State('refresh-scatter', 'data')]
+# )
+# def update_annotations(n_clicks, selected_labels, samples_json, refresh_counter):
+#     if n_clicks is None or samples_json is None:
+#         raise PreventUpdate
     
-    samples = json.loads(samples_json)
-    current_sample = samples["data"][samples["current_index"]]
-    sound_path = current_sample['sound_path']
+#     print("✅ Entered update_annotations()")
+#     print(f"n_clicks: {n_clicks}, samples_json present: {samples_json is not None}")
 
-    row_index = annotations_df.index[annotations_df['sound_path'] == sound_path].tolist()
-    if not row_index:
-        row_index = len(annotations_df)
-        annotations_df.loc[row_index] = [current_sample['x'], current_sample['y'], current_sample['z'], sound_path] + [0] * len(label_options)
+#     samples = json.loads(samples_json)
+#     current_sample = samples["data"][samples["current_index"]]
+#     sound_path = current_sample['sound_path']
 
-    for label in label_options:
-        column_name = label.lower().replace(' ', '_')
-        annotations_df.loc[row_index, column_name] = 1 if label in selected_labels else 0
+#     global df
 
-    return dash.no_update
+#     if 'propagated_class' not in df.columns:
+#         df['propagated_class'] = ""
+
+#     for label in label_options:
+#         col_name = label.lower().replace(' ', '_')
+#         if col_name not in df.columns:
+#             df[col_name] = 0
+
+#     row_idx = df.index[df['sound_path'] == sound_path]
+#     if len(row_idx) == 0:
+#         print(f"⚠️ No matching row in df for sound_path: {sound_path}")
+#         return dash.no_update
+
+#     for label in label_options:
+#         col = label.lower().replace(' ', '_')
+#         df.loc[row_idx, col] = 1 if label in selected_labels else 0
+
+#     print(f"✅ Updated labels for sample at {sound_path}")
+
+#     # Check if all sampled points in this cluster are labeled
+#     cluster_id = df.loc[row_idx, 'class'].values[0]
+#     sampled_cluster = df[(df['class'] == cluster_id) & (df['sampled'])]
+
+#     # Ensure label columns are all numeric 0/1
+#     label_cols = [l.lower().replace(' ', '_') for l in label_options]
+#     sampled_cluster[label_cols] = sampled_cluster[label_cols].fillna(0).astype(int)
+
+#     # Check if every sampled point has at least one label
+#     labeled = sampled_cluster[label_cols].sum(axis=1) > 0
+#     print(f"Sampled cluster size: {len(sampled_cluster)} | Labeled count: {labeled.sum()}")
+
+#     if labeled.all():
+#         label_counts = sampled_cluster[label_cols].sum()
+#         majority_labels = label_counts[label_counts == label_counts.max()].index.tolist()
+#         propagated_class_str = ' + '.join([l.replace('_', ' ') for l in majority_labels])
+
+#         df.loc[df['class'] == cluster_id, 'propagated_class'] = propagated_class_str
+#         print(f"✅ Propagated for Cluster {cluster_id}: {propagated_class_str}")
+#         return refresh_counter + 1
+
+#     print(f"❌ Not propagating: labeled = {labeled.sum()} / {len(sampled_cluster)}")
+#     return refresh_counter
+
+# @app.callback(
+#     Output('csv-download-link', 'href'),
+#     Input('control-button', 'n_clicks'),
+#     prevent_initial_call=True
+# )
+# def save_and_download_csv(n_clicks):
+#     if n_clicks is None:
+#         raise PreventUpdate
+
+#     filepath = 'annotations.csv'
+#     save_annotations_to_csv(annotations_df, filepath)
+#     return f'/download/{filepath}'
 
 @app.callback(
-    Output('csv-download-link', 'href'),
-    Input('control-button', 'n_clicks'),
+    Output("csv-download", "data"),
+    Input("csv-download-btn", "n_clicks"),
     prevent_initial_call=True
 )
-def save_and_download_csv(n_clicks):
-    if n_clicks is None:
+def trigger_csv_download(n):
+    global df, uploaded_filenames
+    if df is None or df.empty:
         raise PreventUpdate
 
-    filepath = 'annotations.csv'
-    save_annotations_to_csv(annotations_df, filepath)
-    return f'/download/{filepath}'
+    label_cols = [label.lower().replace(' ', '_') for label in label_options]
+    required_cols = ['x', 'y', 'z', 'class', 'sound_path', 'sampled'] + label_cols + ['propagated_class']
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = "" if col == 'propagated_class' else 0
+
+    df['start_time'] = df['sound_path'].apply(lambda path: extract_time_from_filename(path, 'start'))
+    df['end_time'] = df['sound_path'].apply(lambda path: extract_time_from_filename(path, 'end'))
+    df['start_datetime'] = df['start_time'].apply(convert_ms_to_datetime)
+    df['end_datetime'] = df['end_time'].apply(convert_ms_to_datetime)
+
+    export_cols = ['x', 'y', 'z', 'class', 'start_time', 'end_time',
+                   'start_datetime', 'end_datetime',
+                   'sound_path', 'sampled'] + label_cols + ['propagated_class']
+
+    # Compose filename
+    safe_name = '+'.join(uploaded_filenames)[:100].replace(' ', '_')
+    filename = f"{safe_name}_annotations.csv"
+
+    return dcc.send_data_frame(df[export_cols].to_csv, filename, index=False)
+
+
+def convert_ms_to_datetime(ms):
+    from datetime import datetime, timedelta
+    base = datetime(1970, 1, 1)
+    dt = base + timedelta(milliseconds=ms)
+    return dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # e.g., 2021-05-01 12:34:56.789
+
+def extract_time_from_filename(path, mode='start'):
+    try:
+        # Find timestamps like "_489445_0.flac" → extract index
+        match = re.search(r"_(\d+)_(\d+)\.", os.path.basename(path))
+        if match:
+            base = int(match.group(1))
+            offset = int(match.group(2))
+            start = base + (offset * 4500)
+            end = start + 4500
+            return start if mode == 'start' else end
+        else:
+            return 0
+    except Exception as e:
+        print(f"[Time Extract Error] {e}")
+        return 0
 
 @app.server.route('/download/<path:filename>')
-def serve_file(filename):
-    file_path = os.path.join(DATA_DIRECTORY, filename)
-    if not os.path.exists(file_path):
-        return f"File not found: {filename}", 404
-    return send_from_directory(DATA_DIRECTORY, filename, as_attachment=True)
+def serve_csv(filename):
+    print(f"📦 Serving file: {filename}")
+    print(f"🔗 Generated download link: /download/{filename}")
+    print(f"📁 Looking in: {DATA_DIRECTORY}")
+    return flask.send_from_directory(DATA_DIRECTORY, filename, as_attachment=True)
 
 @app.callback(
     [Output('scatter-plot', 'figure'),
@@ -927,13 +1062,18 @@ def serve_file(filename):
      Input('previous-cluster', 'n_clicks'),  # New input
      Input('file-dropdown', 'value'),
      Input('scatter-plot', 'clickData'),
-     Input('class-labels-checklist', 'value'),
-     Input('csv-test', 'children')],
-    State('hidden-sample-data', 'children'))
-def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, prev_cluster_clicks, selected_file, clickData, selected_labels, csv_path, samples_json):
+     Input('csv-test', 'children'),
+     Input('refresh-scatter', 'data')],
+    State('hidden-sample-data', 'children'),
+    State('class-labels-checklist', 'value'))
+def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, prev_cluster_clicks, selected_file, clickData, csv_path, refresh_trigger, samples_json, selected_labels):
     global current_cluster_index, sampled_point_index, current_csv_file
+
+    if selected_labels is None:
+        selected_labels = []
+
     ctx = dash.callback_context
-    if not ctx.triggered:
+    if not ctx.triggered or df is None:
         return dash.no_update, dash.no_update, dash.no_update
     else:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
@@ -941,10 +1081,42 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
     # Initialize samples if necessary
     if samples_json is None or current_cluster_index >= len(df['class'].unique()):
         current_class = df['class'].unique()[current_cluster_index]
-        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
+        class_subset = df[df['class'] == current_class]
+        sample_size = max(1, int(0.1 * len(class_subset)))  # At least 1
+        sampled_points = df[(df['class'] == current_class) & (df['sampled'])].to_dict('records')
+        
         samples_json = json.dumps({"data": sampled_points, "current_index": 0})
 
     samples = json.loads(samples_json)
+
+    # ✅ Only save labels if we're moving samples or clusters
+    if button_id in ['next-point', 'previous-point', 'next-cluster', 'previous-cluster']:
+        current_sample = samples["data"][samples["current_index"]]
+        sound_path = current_sample['sound_path']
+        row_idx = df.index[df['sound_path'] == sound_path]
+
+        for label in label_options:
+            col = label.lower().replace(' ', '_')
+            if col not in df.columns:
+                df[col] = 0
+            df.loc[row_idx, col] = 1 if label in selected_labels else 0
+
+        # Propagate if needed
+        cluster_id = df.loc[row_idx, 'class'].values[0]
+        sampled_rows = df[(df['class'] == cluster_id) & (df['sampled'])].copy()
+        label_cols = [label.lower().replace(' ', '_') for label in label_options]
+        labeled = sampled_rows[label_cols].fillna(0).astype(int).sum(axis=1) > 0
+
+        if labeled.all():
+            label_counts = sampled_rows[label_cols].sum()
+            max_count = label_counts.max()
+            majority_labels = label_counts[label_counts == max_count].index.tolist()
+            propagated_class_str = ' + '.join([l.replace('_', ' ') for l in majority_labels])
+            print(f"✅ Propagated for Cluster {cluster_id}: {propagated_class_str}")
+            df.loc[df['class'] == cluster_id, 'propagated_class'] = propagated_class_str
+
+    if button_id == 'refresh-scatter':
+        return create_figure(df, current_cluster_index), dash.no_update, dash.no_update
 
     if button_id in ['next-cluster', 'previous-cluster']:
         if button_id == 'next-cluster':
@@ -958,10 +1130,16 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
             current_cluster_index = len(df['class'].unique()) - 1  # Reset to the last cluster
             
         current_class = df['class'].unique()[current_cluster_index]
-        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
+        class_subset = df[df['class'] == current_class]
+        sample_size = max(1, int(0.1 * len(class_subset)))  # At least 1
+        sampled_points = df[(df['class'] == current_class) & (df['sampled'])].to_dict('records')
+        
         samples_json = json.dumps({"data": sampled_points, "current_index": 0})
         samples = json.loads(samples_json)
         sampled_point_index = 0
+
+        new_fig = create_figure(df, current_cluster_index)
+        return new_fig, f"Now annotating cluster: {current_class}", samples_json
 
     if button_id == 'csv-test' and csv_path:
         new_df = pd.read_csv(csv_path)
@@ -971,27 +1149,63 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
 
     elif button_id == 'next-point':
         sampled_point_index = samples.get('current_index', 0) + 1
-        if sampled_point_index >= 10:
-            current_cluster_index += 1
-            if current_cluster_index >= len(df['class'].unique()):
-                current_cluster_index = 0
-            current_class = df['class'].unique()[current_cluster_index]
-            sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
-            samples_json = json.dumps({"data": sampled_points, "current_index": 0})
-            samples = json.loads(samples_json)
-            sampled_point_index = 0
+        sample_count = len(samples["data"])
+
+        if sampled_point_index < sample_count:
+            # Stay in current cluster
+            samples['current_index'] = sampled_point_index
+            current_sample = samples["data"][sampled_point_index]
+            samples_json = json.dumps(samples)
+            play_sound(current_sample['sound_path'])
+            current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
+            status = f"Playing sample {sampled_point_index + 1} from cluster: {current_class}"
+            return dash.no_update, status, samples_json
+
+        # Rollover to next cluster
+        current_cluster_index += 1
+        if current_cluster_index >= len(df['class'].unique()):
+            current_cluster_index = 0
+        current_class = df['class'].unique()[current_cluster_index]
+        class_subset = df[df['class'] == current_class]
+        sample_size = max(1, int(0.1 * len(class_subset)))
+        sampled_points = df[(df['class'] == current_class) & (df['sampled'])].to_dict('records')
+        samples = {"data": sampled_points, "current_index": 0}
+        current_sample = samples["data"][0]
+        samples_json = json.dumps(samples)
+        new_fig = create_figure(df, current_cluster_index)
+        play_sound(current_sample['sound_path'])
+        status = f"Now annotating cluster: {current_class}"
+        return new_fig, status, samples_json
 
     elif button_id == 'previous-point':
         sampled_point_index = samples.get('current_index', 0) - 1
-        if sampled_point_index < 0:
-            current_cluster_index -= 1
-            if current_cluster_index < 0:
-                current_cluster_index = len(df['class'].unique()) - 1
-            current_class = df['class'].unique()[current_cluster_index]
-            sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
-            samples_json = json.dumps({"data": sampled_points, "current_index": 9})
-            samples = json.loads(samples_json)
-            sampled_point_index = 9
+
+        if sampled_point_index >= 0:
+            # Stay in current cluster
+            samples['current_index'] = sampled_point_index
+            current_sample = samples["data"][sampled_point_index]
+            samples_json = json.dumps(samples)
+            play_sound(current_sample['sound_path'])
+            current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
+            status = f"Playing sample {sampled_point_index + 1} from cluster: {current_class}"
+            return dash.no_update, status, samples_json
+
+        # Rollover to previous cluster
+        current_cluster_index -= 1
+        if current_cluster_index < 0:
+            current_cluster_index = len(df['class'].unique()) - 1
+        current_class = df['class'].unique()[current_cluster_index]
+        class_subset = df[df['class'] == current_class]
+        sample_size = max(1, int(0.1 * len(class_subset)))
+        sampled_points = df[(df['class'] == current_class) & (df['sampled'])].to_dict('records')
+        samples = {"data": sampled_points, "current_index": len(sampled_points) - 1}
+        current_sample = samples["data"][-1]
+        samples_json = json.dumps(samples)
+        new_fig = create_figure(df, current_cluster_index)
+        play_sound(current_sample['sound_path'])
+        status = f"Now annotating cluster: {current_class}"
+        return new_fig, status, samples_json
+
 
     elif button_id == 'play-audio':
         if pygame.mixer.music.get_busy():
@@ -1012,12 +1226,12 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         new_fig = update_figure(selected_file)
         current_csv_file = selected_file
         current_class = df['class'].unique()[current_cluster_index]
-        sampled_points = df[df['class'] == current_class].sample(10).to_dict('records')
+        class_subset = df[df['class'] == current_class]
+        sample_size = max(1, int(0.1 * len(class_subset)))  # At least 1
+        sampled_points = df[(df['class'] == current_class) & (df['sampled'])].to_dict('records')
+        
         new_samples_json = json.dumps({"data": sampled_points, "current_index": 0})
         return new_fig, "File changed. Playing from the first point in the new cluster.", new_samples_json
-    
-    elif button_id == 'control-button': 
-        df.to_csv(current_csv_file, index=False)
 
     elif button_id == 'class-labels-checklist':
         if samples_json is None:
@@ -1034,6 +1248,8 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         
         for label in label_options:
             column_name = label.lower().replace(" ", "_")
+            if column_name not in df.columns:
+                df[column_name] = 0
             
             if column_name in selected_labels:
                 df_current.loc[idx, column_name] = 1
@@ -1047,12 +1263,32 @@ def process_audio(play_clicks, next_clicks, prev_clicks, next_cluster_clicks, pr
         return dash.no_update, "Labels saved.", dash.no_update
     
     elif clickData:
-        clicked_point = clickData['points'][0]['customdata']
-        play_sound(clicked_point)
-        current_class = df[df['sound_path'] == clicked_point]['class'].iloc[0]
+        clicked_path = clickData['points'][0]['customdata']
+        
+        # Always play the sound
+        try:
+            play_sound(clicked_path)
+        except FileNotFoundError:
+            print(f"[ClickData] Could not play sound: {clicked_path}")
+            return dash.no_update, "Sound file not found.", samples_json
+
+        # Try to update current index if it's part of the sample list
+        if samples_json:
+            samples = json.loads(samples_json)
+            matched_index = next((i for i, s in enumerate(samples["data"]) if s["sound_path"] == clicked_path), None)
+            if matched_index is not None:
+                samples['current_index'] = matched_index
+                samples_json = json.dumps(samples)
+
+        current_class = df[df['sound_path'] == clicked_path]['class'].iloc[0]
         status = f"Playing sample from clicked point in cluster: {current_class}"
         return dash.no_update, status, samples_json
 
+
+    sample_count = len(samples["data"])
+    sampled_point_index = min(sampled_point_index, sample_count - 1)
+    if sampled_point_index >= sample_count:
+        raise PreventUpdate
     current_sample = samples["data"][sampled_point_index]
     play_sound(current_sample['sound_path'])
     current_class = df[df['sound_path'] == current_sample['sound_path']]['class'].iloc[0]
@@ -1164,80 +1400,104 @@ def update_plots(samples_json):
 
 @app.callback(
     Output('upload-status', 'children'),
-    [Input('uploader', 'isCompleted')],
+    Input('uploader', 'isCompleted'),
     [State('uploader', 'fileNames'),
      State('uploader', 'upload_id')]
 )
 def handle_file_upload(isCompleted, filenames, upload_id):
-    if not isCompleted:
+    if not isCompleted or not filenames:
         return "No files uploaded."
 
-    if filenames is None or len(filenames) == 0:
-        return "No files uploaded."
-
-    # The folder path where files are uploaded
     folder_path = os.path.join(UPLOAD_FOLDER_ROOT, upload_id)
+    full_paths = [os.path.join(folder_path, fn) for fn in filenames]
 
-    # Save full file paths in a temporary storage for later processing
-    for filename in filenames:
-        file_path = os.path.join(folder_path, filename)
-        uploaded_files.append(file_path)
-    
-    # Store the paths in a hidden div or another suitable storage element
+    # ✅ Correct: Do NOT reassign global list — clear and extend instead
+    uploaded_files.clear()
+    uploaded_files.extend(full_paths)
+
+    uploaded_filenames.clear()
+    uploaded_filenames.extend([os.path.splitext(fn)[0] for fn in filenames])
+
+    print("✅ Uploaded files stored:", uploaded_files)
     return json.dumps(uploaded_files)
+
+
 
 
 @app.callback(
     [Output('file-dropdown', 'options'), 
      Output('file-dropdown', 'value'), 
-     Output('csv-test', 'children')],
-    Input('process-data-button', 'n_clicks'),
+     Output('csv-test', 'children'),
+     Output('processed-data-store', 'data')],
+    Input('trigger-processing', 'data'),
     State('upload-status', 'children'),
+    State('settings-complete', 'data'),
     prevent_initial_call=True
 )
-def process_uploaded_files_and_update_dropdown(n_clicks, stored_file_paths_json):
-    if n_clicks is None or stored_file_paths_json is None:
+def process_uploaded_files_and_update_dropdown(trigger, upload_status_json, settings_complete):
+    if not trigger or not settings_complete:
+        print("⚠️ Settings not complete or trigger is false. Aborting.")
         raise PreventUpdate
 
-    stored_file_paths = json.loads(stored_file_paths_json)
+    try:
+        upload_data = json.loads(upload_status_json)
+        if isinstance(upload_data, str):
+            upload_data = json.loads(upload_data)
+    except Exception as e:
+        print(f"⚠️ Failed to parse upload status: {e}")
+        raise PreventUpdate
+
+    if not upload_data or not isinstance(upload_data, list):
+        print("⚠️ No valid upload data.")
+        raise PreventUpdate
+
+    # Use path of first file to find folder
+    first_path = upload_data[0]
+    upload_folder = os.path.dirname(first_path)
+    all_files = sorted(glob.glob(os.path.join(upload_folder, "*.wav")))
+
+    print("✅ Located folder:", upload_folder)
+    print("✅ Files found:", len(all_files))
+
+    if not all_files:
+        print("⚠️ No files to process.")
+        raise PreventUpdate
+
+    print("✅ Starting processing now...")
+
+    global df, current_csv_file
 
     combined_feature_vectors = []
     combined_sound_paths = []
 
-    # Process each uploaded file
-    for file_path in stored_file_paths:
-        # Ensure the file path is normalized
+    for file_path in all_files:
         file_path = os.path.normpath(file_path)
-        print(f"Processing file: {file_path}")  # Debugging log
+        print(f"Processing file: {file_path}")
 
         audio = AudioSegment.from_file(file_path, format=file_path.rsplit('.', 1)[1].lower())
-        output_folder = os.path.dirname(file_path)  # Extract the correct directory
-        print(f"Output folder: {output_folder}")  # Debugging log
+        output_folder = os.path.dirname(file_path)
 
         feature_vectors, sound_paths = process_audio_chunk(
-            audio, output_folder, file_path.rsplit('.', 1)[1].lower(), 
+            audio, output_folder, file_path.rsplit('.', 1)[1].lower(),
             os.path.splitext(os.path.basename(file_path))[0], duration=20
         )
 
-        # Stack feature vectors and extend sound paths
         combined_feature_vectors.append(feature_vectors)
         combined_sound_paths.extend(sound_paths)
 
-        # Clean up the temporary source file after processing
         os.remove(file_path)
 
-    # Combine feature vectors
+    print("DEBUG: Combined feature vectors collected:", len(combined_feature_vectors))
+    if not combined_feature_vectors:
+        raise ValueError("No feature vectors were extracted.")
+
     combined_feature_vectors = np.vstack(combined_feature_vectors)
 
-    # Apply UMAP for dimensionality reduction
     reducer = umap.UMAP(n_components=3, random_state=0, n_neighbors=6, min_dist=0)
     embedding = reducer.fit_transform(combined_feature_vectors)
 
-    # Perform DBSCAN clustering and calculate silhouette score
     best_eps, best_min_samples, best_score, labels = calculate_silhouette_score(embedding)
 
-    # Prepare a DataFrame with results
-    #sound_paths_no_ext = [os.path.splitext(os.path.basename(path))[0] for path in combined_sound_paths]
     results_df = pd.DataFrame({
         'x': embedding[:, 0],
         'y': embedding[:, 1],
@@ -1246,21 +1506,25 @@ def process_uploaded_files_and_update_dropdown(n_clicks, stored_file_paths_json)
         'sound_path': combined_sound_paths
     })
 
-    # Save processed data as a new CSV file
+    results_df['sampled'] = False
+    for c in results_df['class'].unique():
+        idx = results_df[results_df['class'] == c].sample(frac=0.1, random_state=42).index
+        results_df.loc[idx, 'sampled'] = True
+
+    for label in label_options:
+        col_name = label.lower().replace(" ", "_")
+        if col_name not in results_df.columns:
+            results_df[col_name] = 0
+
     processed_csv_filename = 'data/processed_file.csv'
     results_df.to_csv(processed_csv_filename, index=False)
 
-    # Update dropdown options with the new file
+    df = results_df
+    current_csv_file = processed_csv_filename
+
     new_file_options = [{'label': os.path.basename(file), 'value': file} for file in glob.glob("data/*.csv")]
 
-    # Clear stored file paths after processing
-    stored_file_paths.clear()
-
-    # Return updated options, set new file as the selected CSV, and path for debugging
-    return new_file_options, processed_csv_filename, processed_csv_filename
-
-
-
+    return new_file_options, processed_csv_filename, processed_csv_filename, results_df.to_dict('records')
 
 
 # # Flask route for serving the results CSV file
@@ -1299,16 +1563,23 @@ def process_uploaded_files_and_update_dropdown(n_clicks, stored_file_paths_json)
 
 # Functions
 def play_sound(sound_file):
+    # Use full path if already correct
+    if os.path.exists(sound_file):
+        pygame.mixer.music.load(sound_file)
+        pygame.mixer.music.play()
+        return
+
+    # Else, try constructing from upload folders
     for subfolder in os.listdir(UPLOADS_DIRECTORY):
         subfolder_path = os.path.join(UPLOADS_DIRECTORY, subfolder)
         if os.path.isdir(subfolder_path):
-            full_path = os.path.join(subfolder_path, sound_file)
-            print(f"Checking path: {full_path}")  # Debug log
-            if os.path.exists(full_path):
-                pygame.mixer.music.load(full_path)
+            candidate_path = os.path.join(subfolder_path, os.path.basename(sound_file))
+            if os.path.exists(candidate_path):
+                pygame.mixer.music.load(candidate_path)
                 pygame.mixer.music.play()
                 return
-    raise FileNotFoundError(f"Sound file not found in any subdirectory: {sound_file}")
+
+    raise FileNotFoundError(f"Sound file not found: {sound_file}")
 
 # def play_sound(sound_file):
 #     # Define the expected audio file extensions
